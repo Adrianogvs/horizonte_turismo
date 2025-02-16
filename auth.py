@@ -33,8 +33,7 @@ class AuthManager:
             if username_input == self.username_env and password_input == self.password_env:
                 st.session_state.authenticated = True
                 st.success("Login realizado com sucesso!")
-                # Recarrega a página para ocultar o formulário
-                st.experimental_rerun()
+                # Removemos o st.experimental_rerun() para evitar erro de fluxo
             else:
                 st.error("Credenciais inválidas!")
 

@@ -140,7 +140,7 @@ def main_app():
             db.inserir_viagem(dados)
             st.success("Viagem registrada com sucesso!")
 
-            # Limpa campos do session_state
+            # Limpa os campos do session_state
             keys_to_clear = [
                 "select_origem", "km_saida", "data_saida", "diesel_s10", "valor",
                 "select_motorista", "select_destino", "km_chegada", "data_volta",
@@ -150,7 +150,7 @@ def main_app():
             for key in keys_to_clear:
                 if key in st.session_state:
                     del st.session_state[key]
-            st.experimental_rerun()
+            # Removido st.experimental_rerun() para evitar erro de fluxo
 
     # ======================
     # ABA 2: Tabela Viagens
