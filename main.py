@@ -36,7 +36,7 @@ def main_app():
         st.session_state.authenticated = False
         st.experimental_rerun()
 
-    st.title("📌 Planilha de Viagem - Horizonte Turismo")
+    st.title("📌 Sistema de Viagem - Horizonte Turismo")
 
     # Cria abas
     aba_principal, aba_tabela, aba_grafico, aba_cadastros = st.tabs([
