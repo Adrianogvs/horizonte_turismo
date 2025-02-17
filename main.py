@@ -1,3 +1,29 @@
+import streamlit as st
+import pandas as pd
+import altair as alt
+
+from auth import AuthManager
+from db_manager import DBManager
+from utils import to_excel_bytes
+
+def menu_cadastro(db: DBManager, nome, tabela):
+    """
+    Função auxiliar para gerenciar cadastros (carros, origens, destinos, etc.).
+    """
+    st.subheader(f"Gerenciar {nome}")
+    novo_item = st.text_input(f"Adicionar novo {nome}", key=f"input_{tabela}")
+    if st.button("Adicionar", key=f"add_{tabela}"):
+        db.inserir_registro(tabela, novo_item)
+        st.success(f"{nome} adicionado com sucesso!")
+    
+    registros = db.obter_registros(tabela)
+    st.dataframe(registros)
+    
+    excluir_id = st.number_input(f"ID do {nome} para excluir", min_value=1, step=1, key=f"del_id_{tabela}")
+    if st.button("Excluir", key=f"del_{tabela}"):
+        db.excluir_registro(tabela, excluir_id)
+        st.success(f"{nome} excluído com sucesso!")
+
 def main_app():
     db = DBManager()  # Cria/garante as tabelas
 
@@ -131,18 +157,6 @@ def main_app():
                 if key in st.session_state:
                     del st.session_state[key]
 
-        # Adicionando o botão de exclusão apenas para o Administrador
-        if user_role == "admin":  # Só permite a exclusão se for o administrador
-            senha_input = st.text_input("Digite a senha do Administrador para excluir", type="password")
-            if st.button("Excluir Viagem"):
-                if senha_input == st.secrets["ADMIN_PASSWORD"]:
-                    # Realiza a exclusão do registro
-                    excluir_id = st.number_input(f"ID da Viagem para excluir", min_value=1, step=1, key="del_id_viagem")
-                    db.excluir_registro("viagens", excluir_id)
-                    st.success("Viagem excluída com sucesso!")
-                else:
-                    st.error("Senha incorreta! A exclusão não foi realizada.")
-                    
     # Se o usuário for administrador, exibe abas extras
     if user_role == "admin":
         # ======================
@@ -232,60 +246,40 @@ def main_app():
 
                 with grafico_tab1:
                     viagens_df["data_saida"] = pd.to_datetime(viagens_df["data_saida"])
-                    df_km = viagens_df.groupby("data_saida", as_index=False).agg({
-                        'total_km': 'sum',
-                        'valor_total': 'sum'
-                    })
-
-                    # Linha de tendência
-                    st.line_chart(df_km.set_index("data_saida")[['total_km', 'valor_total']])
-
-                    # Descrição
-                    st.write("Este gráfico mostra a evolução do Total de KM percorridos e do Valor Total das viagens ao longo do tempo. Identifique padrões sazonais e a relação entre o KM e os custos.")
+                    df_km = viagens_df.groupby("data_saida", as_index=False)["total_km"].sum()
+                    st.line_chart(df_km.set_index("data_saida"))
 
                 with grafico_tab2:
+                    total_pedagio = viagens_df["pedagio"].sum()
+                    total_despesa_extra = viagens_df["despesa_extra"].sum()
+                    total_diaria = viagens_df["diaria_motorista"].sum()
+                    total_valor_combustivel = viagens_df["valor_combustivel"].sum()
                     custos = pd.DataFrame({
                         "Categoria": ["Pedágio", "Despesa Extra", "Diária Motorista", "Valor Combustível"],
-                        "Valor": [viagens_df["pedagio"].sum(), viagens_df["despesa_extra"].sum(), viagens_df["diaria_motorista"].sum(), viagens_df["valor_combustivel"].sum()]
+                        "Valor": [total_pedagio, total_despesa_extra, total_diaria, total_valor_combustivel]
                     })
-                    custos["Percentual"] = (custos["Valor"] / custos["Valor"].sum()) * 100  # Percentual de cada custo
-
                     chart = alt.Chart(custos).mark_arc(innerRadius=50).encode(
                         theta=alt.Theta(field="Valor", type="quantitative"),
-                        color=alt.Color(field="Categoria", type="nominal"),
-                        tooltip=[alt.Tooltip(field="Categoria", type="nominal"), alt.Tooltip(field="Valor", type="quantitative"), alt.Tooltip(field="Percentual", type="quantitative")]
+                        color=alt.Color(field="Categoria", type="nominal")
                     ).properties(width=400, height=400)
-
                     st.altair_chart(chart, use_container_width=True)
-
-                    # Descrição
-                    st.write("A distribuição dos custos das viagens pode ajudar a identificar as áreas onde os recursos estão sendo mais consumidos. Analise o impacto de cada categoria de custo.")
 
                 with grafico_tab3:
                     chart_scatter = alt.Chart(viagens_df).mark_circle(size=60).encode(
                         x=alt.X("total_km:Q", title="Total KM"),
                         y=alt.Y("valor_total:Q", title="Valor Total"),
-                        color=alt.Color("origem:N", legend=alt.Legend(title="Origem")),  # Segmentando por origem
-                        size=alt.Size("valor_total:Q", legend=alt.Legend(title="Valor Total")),  # Ajustando o tamanho dos pontos pelo valor total
                         tooltip=["origem", "destino", "total_km", "valor_total"]
                     ).interactive()
-
                     st.altair_chart(chart_scatter, use_container_width=True)
-
-                    # Descrição
-                    st.write("O gráfico de dispersão mostra a relação entre o Total de KM percorridos e o Valor Total das viagens. A segmentação por origem pode revelar padrões de custo e eficiência de cada região.")
 
                 with grafico_tab4:
                     chart_hist = alt.Chart(viagens_df).mark_bar().encode(
-                        alt.X("total_km:Q", bin=alt.Bin(maxbins=20), title="Total KM (binning)"),  # Melhorar binning
-                        y=alt.Y("count():Q", title="Número de Viagens"),
-                        color=alt.Color("total_km:Q", scale=alt.Scale(scheme='greens'))
-                    ).properties(width=600, height=400)
-
+                        alt.X("total_km:Q", bin=alt.Bin(maxbins=30), title="Total KM"),
+                        y=alt.Y("count()", title="Contagem")
+                    )
                     st.altair_chart(chart_hist, use_container_width=True)
-
-                    # Descrição
-                    st.write("Este histograma mostra a distribuição do Total KM percorrido nas viagens. Pode ajudar a identificar os intervalos de distância mais frequentes e onde as viagens mais longas ou curtas predominam.")
+            else:
+                st.info("Nenhuma viagem registrada ainda.")
 
     # ==================
     # ABA 4: Cadastros (disponível para ambos os papéis)
