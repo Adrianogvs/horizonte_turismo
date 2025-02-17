@@ -159,8 +159,17 @@ def main_app():
                 pedagio,
                 computed_valor_total
             )
+            
+            # Insere a viagem no banco de dados
             db.inserir_viagem(dados)
+            
+            # Exibe mensagem de sucesso
             st.success("Viagem registrada com sucesso!")
+
+            # Registro no log (quem fez a operação)
+            user_name = st.session_state.get("user_name", "Usuário desconhecido")  # Nome do usuário
+            logger.info(f"Viagem registrada por {user_name}. Dados da viagem: {dados}")
+
 
             # Limpa os campos do session_state
             keys_to_clear = [
