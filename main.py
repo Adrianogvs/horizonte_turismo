@@ -1,13 +1,20 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
-from log_manager import setup_logger
+from loguru import logger
+import sys
+
+# Configuração do Logger
+logger.remove()  # Remove o logger padrão
+logger.add(sys.stdout, level="INFO")  # Log para o console (Streamlit Cloud)
+logger.add("app_log_{time}.log", level="INFO")  # Salva os logs em um arquivo
+
 from auth import AuthManager
 from db_manager import DBManager
 from utils import to_excel_bytes
 
-# Configura o logger
-logger = setup_logger()
+# Log de início
+logger.info("Iniciando a aplicação Streamlit")
 
 def menu_cadastro(db: DBManager, nome, tabela):
     """
@@ -18,6 +25,7 @@ def menu_cadastro(db: DBManager, nome, tabela):
     if st.button("Adicionar", key=f"add_{tabela}"):
         db.inserir_registro(tabela, novo_item)
         st.success(f"{nome} adicionado com sucesso!")
+        logger.info(f"{nome} {novo_item} adicionado com sucesso!")
 
     registros = db.obter_registros(tabela)
     st.dataframe(registros)
@@ -26,6 +34,7 @@ def menu_cadastro(db: DBManager, nome, tabela):
     if st.button("Excluir", key=f"del_{tabela}"):
         db.excluir_registro(tabela, excluir_id)
         st.success(f"{nome} excluído com sucesso!")
+        logger.info(f"{nome} com ID {excluir_id} excluído com sucesso!")
 
 def main_app():
     db = DBManager()  # Cria/garante as tabelas
@@ -41,9 +50,9 @@ def main_app():
 
     # Recupera o papel do usuário salvo na sessão (definido durante o login)
     user_role = st.session_state.get("role", "operator")  # padrão: operador
-
-    # Exemplo de log
     logger.info(f"Usuário com papel {user_role} acessando a aplicação.")
+
+    # Adicione mais logs conforme o fluxo da aplicação
 
     # Define as abas de acordo com o papel do usuário
     if user_role == "admin":
