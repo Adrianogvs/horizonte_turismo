@@ -1,17 +1,11 @@
+# auth.py
 import os
+import streamlit as st
 from dotenv import load_dotenv
 
 class AuthManager:
     def __init__(self, env_file=".env"):
-        # Tenta carregar o arquivo .env
-        try:
-            load_dotenv(dotenv_path=env_file)
-            # Verifica se as variáveis estão sendo lidas corretamente
-            print(f"ADMIN_USERNAME: {os.getenv('ADMIN_USERNAME')}")
-            print(f"ADMIN_PASSWORD: {os.getenv('ADMIN_PASSWORD')}")
-        except Exception as e:
-            print(f"Erro ao carregar o arquivo .env: {e}")
-        
+        load_dotenv(dotenv_path=env_file)
         self.admin_username = (os.getenv("ADMIN_USERNAME") or "").strip()
         self.admin_password = (os.getenv("ADMIN_PASSWORD") or "").strip()
         self.operator_username = (os.getenv("OPERATOR_USERNAME") or "").strip()
