@@ -27,13 +27,17 @@ def menu_cadastro(db: DBManager, nome, tabela):
             senha_input = st.text_input("Digite a senha do Administrador", type="password")
             
             # Verifica se a senha está correta
-            if senha_input == os.getenv("ADMIN_PASSWORD"):
+            admin_password = os.getenv("ADMIN_PASSWORD")
+            if admin_password is None:
+                st.error("A senha do administrador não está definida nas variáveis de ambiente.")
+            elif senha_input == admin_password:
                 db.excluir_registro(tabela, excluir_id)
                 st.success(f"{nome} excluído com sucesso!")
             else:
                 st.error("Senha incorreta! A exclusão não foi realizada.")
         else:
             st.error("Não é permitido excluir registros da tabela 'viagens'.")
+
 
 
 def main_app():
