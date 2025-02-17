@@ -237,11 +237,12 @@ def main_app():
             st.subheader("📊 Gráficos de Viagens")
             viagens_df = db.obter_registros("viagens")
             if not viagens_df.empty:
-                grafico_tab1, grafico_tab2, grafico_tab3, grafico_tab4 = st.tabs([
+                grafico_tab1, grafico_tab2, grafico_tab3, grafico_tab4, grafico_tab5 = st.tabs([
                     "Total KM por Data",
                     "Distribuição dos Custos",
                     "Valor Total x Total KM",
-                    "Histograma de Total KM"
+                    "Histograma de Total KM",
+                    "Evolução dos Custos de Viagem"
                 ])
 
                 with grafico_tab1:
@@ -300,6 +301,29 @@ def main_app():
 
                     # Descrição
                     st.write("Este histograma mostra a distribuição do Total KM percorrido nas viagens. Pode ajudar a identificar os intervalos de distância mais frequentes e onde as viagens mais longas ou curtas predominam.")
+
+                with grafico_tab5:
+                    # Preparar os dados para o gráfico de área empilhada
+                    df_costos = viagens_df.groupby("data_saida")[["pedagio", "despesa_extra", "diaria_motorista", "valor_combustivel"]].sum().reset_index()
+
+                    # Gráfico de área empilhada
+                    chart_area = alt.Chart(df_costos).mark_area().encode(
+                        x='data_saida:T',  # Eixo X como data
+                        y=alt.Y('pedagio:Q', stack='zero', title="Custo Total"),
+                        color=alt.Color('variable:N', title="Categoria de Custo"),
+                    ).transform_fold(
+                        ['pedagio', 'despesa_extra', 'diaria_motorista', 'valor_combustivel'],  # As variáveis que serão empilhadas
+                        as_=['variable', 'value']
+                    ).properties(
+                        title="Evolução dos Custos de Viagem ao Longo do Tempo",
+                        width=800,
+                        height=400
+                    )
+
+                    st.altair_chart(chart_area, use_container_width=True)
+
+                    # Descrição
+                    st.write("Este gráfico de área empilhada mostra a evolução dos custos de viagem ao longo do tempo. A segmentação por categoria de custo revela como cada tipo de custo contribui para o custo total das viagens ao longo dos dias.")
 
     # ==================
     # ABA 4: Cadastros (disponível para ambos os papéis)
