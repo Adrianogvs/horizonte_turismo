@@ -5,7 +5,7 @@ conn = sqlite3.connect('viagens.db')
 cursor = conn.cursor()
 
 # Executa um SELECT simples
-cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+cursor.execute("SELECT * FROM viagens")
 rows = cursor.fetchall()
 
 # Exibe as linhas retornadas
