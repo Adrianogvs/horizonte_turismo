@@ -1,10 +1,13 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
-
+from log_manager import setup_logger
 from auth import AuthManager
 from db_manager import DBManager
 from utils import to_excel_bytes
+
+# Configura o logger
+logger = setup_logger()
 
 def menu_cadastro(db: DBManager, nome, tabela):
     """
@@ -32,11 +35,15 @@ def main_app():
     if st.sidebar.button("Logout"):
         st.session_state.authenticated = False
         st.experimental_rerun()
+        logger.info("Usuário fez logout.")
 
     st.title("📌 Sistema Gestão de Viagem - Horizonte Turismo")
 
     # Recupera o papel do usuário salvo na sessão (definido durante o login)
     user_role = st.session_state.get("role", "operator")  # padrão: operador
+
+    # Exemplo de log
+    logger.info(f"Usuário com papel {user_role} acessando a aplicação.")
 
     # Define as abas de acordo com o papel do usuário
     if user_role == "admin":
