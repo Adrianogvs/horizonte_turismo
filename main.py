@@ -1,29 +1,3 @@
-import streamlit as st
-import pandas as pd
-import altair as alt
-
-from auth import AuthManager
-from db_manager import DBManager
-from utils import to_excel_bytes
-
-def menu_cadastro(db: DBManager, nome, tabela):
-    """
-    Função auxiliar para gerenciar cadastros (carros, origens, destinos, etc.).
-    """
-    st.subheader(f"Gerenciar {nome}")
-    novo_item = st.text_input(f"Adicionar novo {nome}", key=f"input_{tabela}")
-    if st.button("Adicionar", key=f"add_{tabela}"):
-        db.inserir_registro(tabela, novo_item)
-        st.success(f"{nome} adicionado com sucesso!")
-
-    registros = db.obter_registros(tabela)
-    st.dataframe(registros)
-
-    excluir_id = st.number_input(f"ID do {nome} para excluir", min_value=1, step=1, key=f"del_id_{tabela}")
-    if st.button("Excluir", key=f"del_{tabela}"):
-        db.excluir_registro(tabela, excluir_id)
-        st.success(f"{nome} excluído com sucesso!")
-
 def main_app():
     db = DBManager()  # Cria/garante as tabelas
 
@@ -157,6 +131,18 @@ def main_app():
                 if key in st.session_state:
                     del st.session_state[key]
 
+        # Adicionando o botão de exclusão apenas para o Administrador
+        if user_role == "admin":  # Só permite a exclusão se for o administrador
+            senha_input = st.text_input("Digite a senha do Administrador para excluir", type="password")
+            if st.button("Excluir Viagem"):
+                if senha_input == st.secrets["ADMIN_PASSWORD"]:
+                    # Realiza a exclusão do registro
+                    excluir_id = st.number_input(f"ID da Viagem para excluir", min_value=1, step=1, key="del_id_viagem")
+                    db.excluir_registro("viagens", excluir_id)
+                    st.success("Viagem excluída com sucesso!")
+                else:
+                    st.error("Senha incorreta! A exclusão não foi realizada.")
+                    
     # Se o usuário for administrador, exibe abas extras
     if user_role == "admin":
         # ======================
