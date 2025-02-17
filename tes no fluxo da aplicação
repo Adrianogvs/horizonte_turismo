@@ -1,0 +1,63 @@
+[33mcommit 1d6b889868f038895cbc64a6e475bee9f3d5e338[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mAdrianogvs[m[33m)[m
+Author: Adrianogvs <dataengineer@adrianogvs.com.br>
+Date:   Mon Feb 17 01:02:04 2025 -0300
+
+    feat: Ajuste no COdigo main.py Acessando os Logs no Streamlit Cloud:
+
+[1mdiff --git a/main.py b/main.py[m
+[1mindex 57dfa75..3abafab 100644[m
+[1m--- a/main.py[m
+[1m+++ b/main.py[m
+[36m@@ -1,13 +1,20 @@[m
+ import streamlit as st[m
+ import pandas as pd[m
+ import altair as alt[m
+[31m-from log_manager import setup_logger[m
+[32m+[m[32mfrom loguru import logger[m
+[32m+[m[32mimport sys[m
+[32m+[m
+[32m+[m[32m# Configuração do Logger[m
+[32m+[m[32mlogger.remove()  # Remove o logger padrão[m
+[32m+[m[32mlogger.add(sys.stdout, level="INFO")  # Log para o console (Streamlit Cloud)[m
+[32m+[m[32mlogger.add("app_log_{time}.log", level="INFO")  # Salva os logs em um arquivo[m
+[32m+[m
+ from auth import AuthManager[m
+ from db_manager import DBManager[m
+ from utils import to_excel_bytes[m
+ [m
+[31m-# Configura o logger[m
+[31m-logger = setup_logger()[m
+[32m+[m[32m# Log de início[m
+[32m+[m[32mlogger.info("Iniciando a aplicação Streamlit")[m
+ [m
+ def menu_cadastro(db: DBManager, nome, tabela):[m
+     """[m
+[36m@@ -18,6 +25,7 @@[m [mdef menu_cadastro(db: DBManager, nome, tabela):[m
+     if st.button("Adicionar", key=f"add_{tabela}"):[m
+         db.inserir_registro(tabela, novo_item)[m
+         st.success(f"{nome} adicionado com sucesso!")[m
+[32m+[m[32m        logger.info(f"{nome} {novo_item} adicionado com sucesso!")[m
+ [m
+     registros = db.obter_registros(tabela)[m
+     st.dataframe(registros)[m
+[36m@@ -26,6 +34,7 @@[m [mdef menu_cadastro(db: DBManager, nome, tabela):[m
+     if st.button("Excluir", key=f"del_{tabela}"):[m
+         db.excluir_registro(tabela, excluir_id)[m
+         st.success(f"{nome} excluído com sucesso!")[m
+[32m+[m[32m        logger.info(f"{nome} com ID {excluir_id} excluído com sucesso!")[m
+ [m
+ def main_app():[m
+     db = DBManager()  # Cria/garante as tabelas[m
+[36m@@ -41,10 +50,10 @@[m [mdef main_app():[m
+ [m
+     # Recupera o papel do usuário salvo na sessão (definido durante o login)[m
+     user_role = st.session_state.get("role", "operator")  # padrão: operador[m
+[31m-[m
+[31m-    # Exemplo de log[m
+     logger.info(f"Usuário com papel {user_role} acessando a aplicação.")[m
+ [m
+[32m+[m[32m    # Adicione mais logs conforme o fluxo da aplicação[m
+[32m+[m
+     # Define as abas de acordo com o papel do usuário[m
+     if user_role == "admin":[m
+         # Administrador tem acesso a todas as funcionalidades[m
