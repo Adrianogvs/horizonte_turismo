@@ -1,15 +1,20 @@
-# auth.py
+from dotenv import load_dotenv
 import os
 import streamlit as st
-from dotenv import load_dotenv
 
 class AuthManager:
     def __init__(self, env_file=".env"):
         load_dotenv(dotenv_path=env_file)
-        self.admin_username = (os.getenv("ADMIN_USERNAME") or "").strip()
-        self.admin_password = (os.getenv("ADMIN_PASSWORD") or "").strip()
-        self.operator_username = (os.getenv("OPERATOR_USERNAME") or "").strip()
-        self.operator_password = (os.getenv("OPERATOR_PASSWORD") or "").strip()
+        
+        # Verificando se as variáveis estão sendo carregadas corretamente
+        self.admin_username = os.getenv("ADMIN_USERNAME", "").strip()
+        self.admin_password = os.getenv("ADMIN_PASSWORD", "").strip()  # Senha do admin
+        self.operator_username = os.getenv("OPERATOR_USERNAME", "").strip()
+        self.operator_password = os.getenv("OPERATOR_PASSWORD", "").strip()
+
+        # Se a senha do administrador não estiver definida, mostra um erro
+        if not self.admin_password:
+            raise ValueError("A variável de ambiente ADMIN_PASSWORD não foi carregada corretamente.")
 
     def login(self):
         if "authenticated" not in st.session_state:
