@@ -1,16 +1,13 @@
 from dotenv import load_dotenv
-import os
 import streamlit as st
 
 class AuthManager:
-    def __init__(self, env_file=".env"):
-        load_dotenv(dotenv_path=env_file)
-        
-        # Verificando se as variáveis estão sendo carregadas corretamente
-        self.admin_username = os.getenv("ADMIN_USERNAME", "").strip()
-        self.admin_password = os.getenv("ADMIN_PASSWORD", "").strip()  # Senha do admin
-        self.operator_username = os.getenv("OPERATOR_USERNAME", "").strip()
-        self.operator_password = os.getenv("OPERATOR_PASSWORD", "").strip()
+    def __init__(self):
+        # Carregar variáveis de ambiente usando st.secrets em vez de .env
+        self.admin_username = st.secrets["ADMIN_USERNAME"]
+        self.admin_password = st.secrets["ADMIN_PASSWORD"]
+        self.operator_username = st.secrets["OPERATOR_USERNAME"]
+        self.operator_password = st.secrets["OPERATOR_PASSWORD"]
 
         # Se a senha do administrador não estiver definida, mostra um erro
         if not self.admin_password:
