@@ -1,4 +1,3 @@
-# auth.py
 import os
 import streamlit as st
 from dotenv import load_dotenv
@@ -26,12 +25,14 @@ class AuthManager:
             # Verifica se é administrador
             if username_input == self.admin_username and password_input == self.admin_password:
                 st.session_state.authenticated = True
-                st.session_state.role = "admin"  # Papel: administrador
+                st.session_state.role = "admin"
+                st.session_state.user_name = username_input
                 st.success("Login realizado com sucesso como Administrador!")
             # Verifica se é operador
             elif username_input == self.operator_username and password_input == self.operator_password:
                 st.session_state.authenticated = True
-                st.session_state.role = "operator"  # Papel: operador
+                st.session_state.role = "operator"
+                st.session_state.user_name = username_input
                 st.success("Login realizado com sucesso como Operador!")
             else:
                 st.error("Credenciais inválidas!")

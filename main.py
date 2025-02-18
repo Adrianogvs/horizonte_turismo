@@ -4,17 +4,19 @@ import altair as alt
 from loguru import logger
 import sys
 
-# Configuração do Logger
+# Configuração do Logger (usando loguru)
 logger.remove()  # Remove o logger padrão
-logger.add(sys.stdout, level="INFO")  # Log para o console (Streamlit Cloud)
-logger.add("app_log_{time}.log", level="INFO")  # Salva os logs em um arquivo
+logger.add(sys.stdout, level="INFO")  # Log para o console (ex. no Streamlit Cloud)
+logger.add("logs/app_log_{time}.log", level="INFO")  # Salva os logs em um arquivo na pasta logs
 
-from auth import AuthManager
-from db_manager import DBManager
-from utils import to_excel_bytes
+# Imports das pastas internas
+from src.auth.auth import AuthManager
+from src.database.db_manager import DBManager
+from src.utils.utils import to_excel_bytes
 
 # Log de início
 logger.info("Iniciando a aplicação Streamlit")
+
 
 def menu_cadastro(db: DBManager, nome, tabela):
     """
@@ -36,8 +38,9 @@ def menu_cadastro(db: DBManager, nome, tabela):
         st.success(f"{nome} excluído com sucesso!")
         logger.info(f"{nome} com ID {excluir_id} excluído com sucesso!")
 
+
 def main_app():
-    db = DBManager()  # Cria/garante as tabelas
+    db = DBManager()  # Inicializa o gerenciador do banco (cria as tabelas, se não existirem)
 
     # Menu lateral com botão de Logout
     st.sidebar.title("Menu")
@@ -52,8 +55,6 @@ def main_app():
     user_role = st.session_state.get("role", "operator")  # padrão: operador
     logger.info(f"Usuário com papel {user_role} acessando a aplicação.")
 
-    # Adicione mais logs conforme o fluxo da aplicação
-
     # Define as abas de acordo com o papel do usuário
     if user_role == "admin":
         # Administrador tem acesso a todas as funcionalidades
@@ -64,11 +65,8 @@ def main_app():
             "Cadastros"
         ])
     else:
-        # Operador tem acesso somente ao Cadastro de Viagem e aos Cadastros
-        aba_principal, aba_cadastros = st.tabs([
-            "Cadastro de Viagem",
-            "Cadastros"
-        ])
+        # Operador tem acesso somente ao Cadastro de Viagem
+        aba_principal = st.tabs(["Cadastro de Viagem"])[0]  # Pegamos o primeiro item da lista de abas
 
     # ====================
     # ABA 1: Cadastro de Viagem
@@ -159,17 +157,16 @@ def main_app():
                 pedagio,
                 computed_valor_total
             )
-            
+
             # Insere a viagem no banco de dados
             db.inserir_viagem(dados)
-            
+
             # Exibe mensagem de sucesso
             st.success("Viagem registrada com sucesso!")
 
             # Registro no log (quem fez a operação)
             user_name = st.session_state.get("user_name", "Usuário desconhecido")  # Nome do usuário
             logger.info(f"Viagem registrada por {user_name}. Dados da viagem: {dados}")
-
 
             # Limpa os campos do session_state
             keys_to_clear = [
@@ -281,63 +278,68 @@ def main_app():
                     st.line_chart(df_km.set_index("data_saida")[['total_km', 'valor_total']])
 
                     # Descrição
-                    st.write("Este gráfico mostra a evolução do Total de KM percorridos e do Valor Total das viagens ao longo do tempo. Identifique padrões sazonais e a relação entre o KM e os custos.")
+                    st.write("Este gráfico mostra a evolução do Total de KM percorridos e do Valor Total das viagens ao longo do tempo.")
 
                 with grafico_tab2:
                     custos = pd.DataFrame({
                         "Categoria": ["Pedágio", "Despesa Extra", "Diária Motorista", "Valor Combustível"],
-                        "Valor": [viagens_df["pedagio"].sum(), viagens_df["despesa_extra"].sum(), viagens_df["diaria_motorista"].sum(), viagens_df["valor_combustivel"].sum()]
+                        "Valor": [
+                            viagens_df["pedagio"].sum(),
+                            viagens_df["despesa_extra"].sum(),
+                            viagens_df["diaria_motorista"].sum(),
+                            viagens_df["valor_combustivel"].sum()
+                        ]
                     })
-                    custos["Percentual"] = (custos["Valor"] / custos["Valor"].sum()) * 100  # Percentual de cada custo
+                    custos["Percentual"] = (custos["Valor"] / custos["Valor"].sum()) * 100
 
                     chart = alt.Chart(custos).mark_arc(innerRadius=50).encode(
                         theta=alt.Theta(field="Valor", type="quantitative"),
                         color=alt.Color(field="Categoria", type="nominal"),
-                        tooltip=[alt.Tooltip(field="Categoria", type="nominal"), alt.Tooltip(field="Valor", type="quantitative"), alt.Tooltip(field="Percentual", type="quantitative")]
+                        tooltip=[
+                            alt.Tooltip(field="Categoria", type="nominal"),
+                            alt.Tooltip(field="Valor", type="quantitative"),
+                            alt.Tooltip(field="Percentual", type="quantitative")
+                        ]
                     ).properties(width=400, height=400)
 
                     st.altair_chart(chart, use_container_width=True)
-
-                    # Descrição
-                    st.write("A distribuição dos custos das viagens pode ajudar a identificar as áreas onde os recursos estão sendo mais consumidos. Analise o impacto de cada categoria de custo.")
+                    st.write("Distribuição dos custos das viagens.")
 
                 with grafico_tab3:
                     chart_scatter = alt.Chart(viagens_df).mark_circle(size=60).encode(
                         x=alt.X("total_km:Q", title="Total KM"),
                         y=alt.Y("valor_total:Q", title="Valor Total"),
-                        color=alt.Color("origem:N", legend=alt.Legend(title="Origem")),  # Segmentando por origem
-                        size=alt.Size("valor_total:Q", legend=alt.Legend(title="Valor Total")),  # Ajustando o tamanho dos pontos pelo valor total
+                        color=alt.Color("origem:N", legend=alt.Legend(title="Origem")),
+                        size=alt.Size("valor_total:Q", legend=alt.Legend(title="Valor Total")),
                         tooltip=["origem", "destino", "total_km", "valor_total"]
                     ).interactive()
 
                     st.altair_chart(chart_scatter, use_container_width=True)
-
-                    # Descrição
-                    st.write("O gráfico de dispersão mostra a relação entre o Total de KM percorridos e o Valor Total das viagens. A segmentação por origem pode revelar padrões de custo e eficiência de cada região.")
+                    st.write("Relação entre o Total de KM percorridos e o Valor Total das viagens.")
 
                 with grafico_tab4:
                     chart_hist = alt.Chart(viagens_df).mark_bar().encode(
-                        alt.X("total_km:Q", bin=alt.Bin(maxbins=20), title="Total KM (binning)"),  # Melhorar binning
+                        alt.X("total_km:Q", bin=alt.Bin(maxbins=20), title="Total KM (binning)"),
                         y=alt.Y("count():Q", title="Número de Viagens"),
                         color=alt.Color("total_km:Q", scale=alt.Scale(scheme='greens'))
                     ).properties(width=600, height=400)
 
                     st.altair_chart(chart_hist, use_container_width=True)
-
-                    # Descrição
-                    st.write("Este histograma mostra a distribuição do Total KM percorrido nas viagens. Pode ajudar a identificar os intervalos de distância mais frequentes e onde as viagens mais longas ou curtas predominam.")
+                    st.write("Distribuição do Total KM percorrido nas viagens.")
 
                 with grafico_tab5:
                     # Preparar os dados para o gráfico de área empilhada
-                    df_costos = viagens_df.groupby("data_saida")[["pedagio", "despesa_extra", "diaria_motorista", "valor_combustivel"]].sum().reset_index()
+                    df_costos = viagens_df.groupby("data_saida")[
+                        ["pedagio", "despesa_extra", "diaria_motorista", "valor_combustivel"]
+                    ].sum().reset_index()
 
                     # Gráfico de área empilhada
                     chart_area = alt.Chart(df_costos).mark_area().encode(
-                        x='data_saida:T',  # Eixo X como data
+                        x='data_saida:T',
                         y=alt.Y('pedagio:Q', stack='zero', title="Custo Total"),
                         color=alt.Color('variable:N', title="Categoria de Custo"),
                     ).transform_fold(
-                        ['pedagio', 'despesa_extra', 'diaria_motorista', 'valor_combustivel'],  # As variáveis que serão empilhadas
+                        ['pedagio', 'despesa_extra', 'diaria_motorista', 'valor_combustivel'],
                         as_=['variable', 'value']
                     ).properties(
                         title="Evolução dos Custos de Viagem ao Longo do Tempo",
@@ -346,37 +348,37 @@ def main_app():
                     )
 
                     st.altair_chart(chart_area, use_container_width=True)
+                    st.write("Gráfico de área empilhada mostrando evolução dos custos de viagem ao longo do tempo.")
 
-                    # Descrição
-                    st.write("Este gráfico de área empilhada mostra a evolução dos custos de viagem ao longo do tempo. A segmentação por categoria de custo revela como cada tipo de custo contribui para o custo total das viagens ao longo dos dias.")
+        # ==================
+        # ABA 4: Cadastros (somente para Administrador)
+        # ==================
+        with aba_cadastros:
+            st.subheader("Cadastro de Dados")
+            tab1, tab2, tab3, tab4, tab5 = st.tabs([
+                "Carros",
+                "Origens",
+                "Destinos",
+                "Tipos de Óleo",
+                "Motoristas"
+            ])
+            with tab1:
+                menu_cadastro(db, "Carro", "carros")
+            with tab2:
+                menu_cadastro(db, "Origem", "origens")
+            with tab3:
+                menu_cadastro(db, "Destino", "destinos")
+            with tab4:
+                menu_cadastro(db, "Tipo de Óleo", "tipos_oleo")
+            with tab5:
+                menu_cadastro(db, "Motorista", "motoristas")
 
-    # ==================
-    # ABA 4: Cadastros (disponível para ambos os papéis)
-    # ==================
-    with aba_cadastros:
-        st.subheader("Cadastro de Dados")
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "Carros",
-            "Origens",
-            "Destinos",
-            "Tipos de Óleo",
-            "Motoristas"
-        ])
-        with tab1:
-            menu_cadastro(db, "Carro", "carros")
-        with tab2:
-            menu_cadastro(db, "Origem", "origens")
-        with tab3:
-            menu_cadastro(db, "Destino", "destinos")
-        with tab4:
-            menu_cadastro(db, "Tipo de Óleo", "tipos_oleo")
-        with tab5:
-            menu_cadastro(db, "Motorista", "motoristas")
 
 def main():
     auth = AuthManager(env_file=".env")
     if auth.login():
         main_app()
+
 
 if __name__ == "__main__":
     main()
