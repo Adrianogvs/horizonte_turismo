@@ -5,21 +5,17 @@ from loguru import logger
 import sys
 import os
 
-# Função auxiliar para limpar os campos do st.session_state
 def limpar_campos(campos):
     for campo in campos:
         if campo in st.session_state:
             del st.session_state[campo]
 
-# Garante a pasta de logs
 os.makedirs("logs", exist_ok=True)
 
-# Configuração do Logger
 logger.remove()
 logger.add(sys.stdout, level="INFO")
 logger.add("logs/app_log_{time}.log", level="INFO")
 
-# Imports internos
 from src.auth.auth import AuthManager
 from src.database.db_manager import DBManager
 from src.utils.utils import to_excel_bytes
@@ -33,12 +29,15 @@ logger.info("Iniciando a aplicação Streamlit")
 
 def cadastro_carros(db: DBManager):
     st.subheader("Gerenciar Carros")
+    user_name = st.session_state.get("user_name", "Desconhecido")
+
     novo_carro = st.text_input("Adicionar novo Carro", key="carro_input")
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Adicionar Carro", key="botao_adicionar_carro"):
             db.inserir_carro(novo_carro)
             st.success("Carro adicionado com sucesso!")
+            logger.info(f"[CADASTRO] Carro adicionado: '{novo_carro}' por {user_name}")
     with col2:
         if st.button("Limpar Campos", key="botao_limpar_carro"):
             limpar_campos(["carro_input"])
@@ -50,15 +49,20 @@ def cadastro_carros(db: DBManager):
     if st.button("Excluir Carro", key="botao_excluir_carro"):
         db.excluir_registro("carros", excluir_id)
         st.success("Carro excluído com sucesso!")
+        logger.info(f"[EXCLUSAO] Carro excluído (ID={excluir_id}) por {user_name}")
+
 
 def cadastro_motoristas(db: DBManager):
     st.subheader("Gerenciar Motoristas")
+    user_name = st.session_state.get("user_name", "Desconhecido")
+
     novo_motorista = st.text_input("Adicionar novo Motorista", key="motorista_input")
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Adicionar Motorista", key="botao_adicionar_motorista"):
             db.inserir_motorista(novo_motorista)
             st.success("Motorista adicionado com sucesso!")
+            logger.info(f"[CADASTRO] Motorista adicionado: '{novo_motorista}' por {user_name}")
     with col2:
         if st.button("Limpar Campos", key="botao_limpar_motorista"):
             limpar_campos(["motorista_input"])
@@ -70,15 +74,20 @@ def cadastro_motoristas(db: DBManager):
     if st.button("Excluir Motorista", key="botao_excluir_motorista"):
         db.excluir_registro("motoristas", excluir_id)
         st.success("Motorista excluído com sucesso!")
+        logger.info(f"[EXCLUSAO] Motorista excluído (ID={excluir_id}) por {user_name}")
+
 
 def cadastro_tipos_oleo(db: DBManager):
     st.subheader("Gerenciar Tipos de Óleo")
+    user_name = st.session_state.get("user_name", "Desconhecido")
+
     novo_oleo = st.text_input("Adicionar novo Tipo de Óleo", key="oleo_input")
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Adicionar Óleo", key="botao_adicionar_oleo"):
             db.inserir_tipo_oleo(novo_oleo)
             st.success("Óleo adicionado com sucesso!")
+            logger.info(f"[CADASTRO] Óleo adicionado: '{novo_oleo}' por {user_name}")
     with col2:
         if st.button("Limpar Campos", key="botao_limpar_oleo"):
             limpar_campos(["oleo_input"])
@@ -90,6 +99,8 @@ def cadastro_tipos_oleo(db: DBManager):
     if st.button("Excluir Óleo", key="botao_excluir_oleo"):
         db.excluir_registro("tipos_oleo", excluir_id)
         st.success("Óleo excluído com sucesso!")
+        logger.info(f"[EXCLUSAO] Óleo excluído (ID={excluir_id}) por {user_name}")
+
 
 # --------------------------------------------------
 # FUNÇÕES DE CADASTRO DE ENDEREÇO (ORIGEM / DESTINO)
@@ -97,6 +108,8 @@ def cadastro_tipos_oleo(db: DBManager):
 
 def cadastro_origem(db: DBManager):
     st.subheader("Cadastro de Origem (Endereço)")
+    user_name = st.session_state.get("user_name", "Desconhecido")
+
     cep_input = st.text_input("Informe o CEP", key="origem_cep_input")
     endereco_info = None
     if cep_input:
@@ -119,9 +132,9 @@ def cadastro_origem(db: DBManager):
                 localidade = endereco_info.get("localidade", "")
                 uf = endereco_info.get("uf", "")
                 endereco_id = db.inserir_endereco(cep, logradouro, complemento, bairro, localidade, uf, numero)
-                db.inserir_origem(endereco_id)
+                origem_id = db.inserir_origem(endereco_id)
                 st.success("Origem cadastrada com sucesso!")
-                logger.info(f"Origem cadastrada com endereço ID {endereco_id}")
+                logger.info(f"[CADASTRO] Origem cadastrada: CEP={cep}, Logradouro='{logradouro}', Número='{numero}', ID_Origem={origem_id} por {user_name}")
             else:
                 st.error("Informe um CEP válido e digite o número do endereço.")
     with col2:
@@ -130,6 +143,8 @@ def cadastro_origem(db: DBManager):
 
 def cadastro_destino(db: DBManager):
     st.subheader("Cadastro de Destino (Endereço)")
+    user_name = st.session_state.get("user_name", "Desconhecido")
+
     cep_input = st.text_input("Informe o CEP", key="destino_cep_input")
     endereco_info = None
     if cep_input:
@@ -152,9 +167,9 @@ def cadastro_destino(db: DBManager):
                 localidade = endereco_info.get("localidade", "")
                 uf = endereco_info.get("uf", "")
                 endereco_id = db.inserir_endereco(cep, logradouro, complemento, bairro, localidade, uf, numero)
-                db.inserir_destino(endereco_id)
+                destino_id = db.inserir_destino(endereco_id)
                 st.success("Destino cadastrado com sucesso!")
-                logger.info(f"Destino cadastrado com endereço ID {endereco_id}")
+                logger.info(f"[CADASTRO] Destino cadastrado: CEP={cep}, Logradouro='{logradouro}', Número='{numero}', ID_Destino={destino_id} por {user_name}")
             else:
                 st.error("Informe um CEP válido e digite o número do endereço.")
     with col2:
@@ -175,7 +190,6 @@ def main_app():
         logger.info("Usuário fez logout.")
 
     st.title("📌 Sistema de Gestão de Viagem - Horizonte Turismo")
-
     user_role = st.session_state.get("role", "operator")
     logger.info(f"Usuário com papel {user_role} acessando a aplicação.")
 
@@ -192,12 +206,12 @@ def main_app():
     # ========== ABA 1: Cadastro de Viagem ==========
     with aba_principal:
         st.subheader("Cadastro de Nova Viagem")
+        user_name = st.session_state.get("user_name", "Desconhecido")
 
         # Carrega as origens e destinos
         origens = db.obter_origens()
         destinos = db.obter_destinos()
 
-        # Concatena os campos para exibir o endereço completo
         opcoes_origem = [
             f"{o['cep']} {o['logradouro']} {o['complemento']} {o['bairro']} {o['localidade']} {o['uf']} {o['numero']}"
             for o in origens
@@ -207,7 +221,6 @@ def main_app():
             for d in destinos
         ]
 
-        # Verifica se há pelo menos uma origem e destino
         tem_origem = len(opcoes_origem) > 0
         tem_destino = len(opcoes_destino) > 0
 
@@ -216,7 +229,6 @@ def main_app():
         if not tem_destino:
             st.warning("Nenhum destino cadastrado. Cadastre um destino antes de registrar viagens.")
 
-        # Cria selectboxes. Se não houver registros, ficam desabilitados
         origem_escolhida = st.selectbox(
             "Selecione a Origem",
             opcoes_origem if tem_origem else ["(Nenhuma origem disponível)"],
@@ -230,7 +242,6 @@ def main_app():
             key="viagem_cadastro_destino"
         )
 
-        # Recupera o ID interno, se houver
         if tem_origem:
             origem_idx = opcoes_origem.index(origem_escolhida)
             origem_id = origens[origem_idx]["origem_id"]
@@ -294,34 +305,29 @@ def main_app():
             st.number_input("Valor Total", value=computed_valor_total, format="%.2f",
                             key="viagem_valor_total", disabled=True)
 
-        # Se não houver origem/destino, desabilita "Salvar Viagem"
         can_save = (origem_id is not None) and (destino_id is not None)
 
         col_salvar, col_limpar = st.columns(2)
         with col_salvar:
             if st.button("Salvar Viagem", key="botao_salvar_viagem", disabled=(not can_save)):
-                db.inserir_viagem(
-                    origem_id=origem_id,
-                    destino_id=destino_id,
-                    carro=carro,
-                    km_saida=km_saida,
-                    km_chegada=km_chegada,
-                    total_km=calculated_total_km,
-                    data_saida=data_saida,
-                    data_volta=data_volta,
-                    valor=valor,
-                    motorista=motorista,
-                    diaria_motorista=diaria_motorista,
-                    despesa_extra=despesa_extra,
-                    diesel_s10=diesel_s10,
-                    diesel_s500=diesel_s500,
-                    litros=litros,
-                    valor_combustivel=computed_valor_combustivel,
-                    pedagio=pedagio,
-                    valor_total=computed_valor_total
+                # Insere a viagem
+                dados = (
+                    origem_id, destino_id, carro,
+                    km_saida, km_chegada, calculated_total_km,
+                    data_saida, data_volta, valor,
+                    motorista, diaria_motorista, despesa_extra,
+                    diesel_s10, diesel_s500, litros,
+                    computed_valor_combustivel, pedagio, computed_valor_total
                 )
+                db.inserir_viagem(*dados)
                 st.success("Viagem registrada com sucesso!")
-                logger.info(f"Viagem inserida: origem_id={origem_id}, destino_id={destino_id}")
+                logger.info(
+                    f"[CADASTRO] Viagem registrada por {user_name}. "
+                    f"OrigemID={origem_id}, DestinoID={destino_id}, Carro='{carro}', Motorista='{motorista}', "
+                    f"KM_Saida={km_saida}, KM_Chegada={km_chegada}, Valor={valor}, "
+                    f"Diaria={diaria_motorista}, DespesaExtra={despesa_extra}, DieselS10={diesel_s10}, DieselS500={diesel_s500}, "
+                    f"Litros={litros}, ValorComb={computed_valor_combustivel}, Pedagio={pedagio}, ValorTotal={computed_valor_total}"
+                )
         with col_limpar:
             if st.button("Limpar Campos", key="botao_limpar_viagem"):
                 limpar_campos([
@@ -340,7 +346,7 @@ def main_app():
             df_viagens = db.obter_viagens_completo()
             if not df_viagens.empty:
                 df_viagens["data_saida"] = pd.to_datetime(df_viagens["data_saida"], errors="coerce")
-                # Filtros
+
                 col1, col2, col3, col4, col5 = st.columns(5)
                 with col1:
                     anos = sorted(df_viagens["data_saida"].dt.year.dropna().unique().tolist())
