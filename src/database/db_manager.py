@@ -283,17 +283,30 @@ class DBManager:
         """
         conn = sqlite3.connect(self.db_path)
         query = '''
-            SELECT 
-                v.*,
-                (e1.cep || ' ' || e1.logradouro || ' ' || COALESCE(e1.complemento, '') || ' ' ||
-                 e1.bairro || ' ' || e1.localidade || ' ' || e1.uf || ' ' || e1.numero) AS origem,
-                (e2.cep || ' ' || e2.logradouro || ' ' || COALESCE(e2.complemento, '') || ' ' ||
-                 e2.bairro || ' ' || e2.localidade || ' ' || e2.uf || ' ' || e2.numero) AS destino
-            FROM viagens v
-            LEFT JOIN origens o ON v.origem_id = o.id
-            LEFT JOIN enderecos e1 ON o.endereco_id = e1.id
-            LEFT JOIN destinos d ON v.destino_id = d.id
-            LEFT JOIN enderecos e2 ON d.endereco_id = e2.id
+                SELECT 
+                v.carro, 
+                v.km_saida, 
+                v.km_chegada, 
+                v.total_km, 
+                v.data_saida, 
+                v.data_volta, 
+                v.valor, 
+                v.motorista, 
+                v.diaria_motorista, 
+                v.despesa_extra, 
+                v.diesel_s10, 
+                v.diesel_s500, 
+                v.litros, 
+                v.valor_combustivel, 
+                v.pedagio, 
+                v.valor_total,
+                (e1.cep || ' ' || e1.logradouro || ' ' || COALESCE(e1.complemento, '') || ' ' || e1.bairro || ' ' || e1.localidade || ' ' || e1.uf || ' ' || e1.numero) AS origem,
+                (e2.cep || ' ' || e2.logradouro || ' ' || COALESCE(e2.complemento, '') || ' ' || e2.bairro || ' ' || e2.localidade || ' ' || e2.uf || ' ' || e2.numero) AS destino
+                FROM viagens v
+                LEFT JOIN origens o ON v.origem_id = o.id
+                LEFT JOIN enderecos e1 ON o.endereco_id = e1.id
+                LEFT JOIN destinos d ON v.destino_id = d.id
+                LEFT JOIN enderecos e2 ON d.endereco_id = e2.id
         '''
         df = pd.read_sql(query, conn)
         conn.close()
