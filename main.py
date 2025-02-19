@@ -6,16 +6,22 @@ import sys
 import os
 
 def limpar_campos(campos):
+    """
+    Remove as chaves informadas do st.session_state, limpando os valores dos widgets.
+    """
     for campo in campos:
         if campo in st.session_state:
             del st.session_state[campo]
 
+# Garante a pasta de logs
 os.makedirs("logs", exist_ok=True)
 
+# Configuração do Logger
 logger.remove()
 logger.add(sys.stdout, level="INFO")
 logger.add("logs/app_log_{time}.log", level="INFO")
 
+# Imports internos
 from src.auth.auth import AuthManager
 from src.database.db_manager import DBManager
 from src.utils.utils import to_excel_bytes
@@ -190,6 +196,7 @@ def main_app():
         logger.info("Usuário fez logout.")
 
     st.title("📌 Sistema de Gestão de Viagem - Horizonte Turismo")
+
     user_role = st.session_state.get("role", "operator")
     logger.info(f"Usuário com papel {user_role} acessando a aplicação.")
 
@@ -212,6 +219,7 @@ def main_app():
         origens = db.obter_origens()
         destinos = db.obter_destinos()
 
+        # Concatena os campos do endereço para exibição no selectbox
         opcoes_origem = [
             f"{o['cep']} {o['logradouro']} {o['complemento']} {o['bairro']} {o['localidade']} {o['uf']} {o['numero']}"
             for o in origens
@@ -305,6 +313,7 @@ def main_app():
             st.number_input("Valor Total", value=computed_valor_total, format="%.2f",
                             key="viagem_valor_total", disabled=True)
 
+        # Se não houver origem/destino, desabilita o botão
         can_save = (origem_id is not None) and (destino_id is not None)
 
         col_salvar, col_limpar = st.columns(2)
@@ -378,7 +387,6 @@ def main_app():
                 if selected_motorista != "Todos":
                     df_filtrado = df_filtrado[df_filtrado["motorista"] == selected_motorista]
 
-                # Subtotais
                 subtotal_total_km = df_filtrado["total_km"].sum()
                 subtotal_valor_total = df_filtrado["valor_total"].sum()
                 subtotal_valor_combustivel = df_filtrado["valor_combustivel"].sum()

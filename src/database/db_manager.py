@@ -27,7 +27,7 @@ class DBManager:
             )
         ''')
 
-        # Tabela de origens (referenciando a tabela de enderecos)
+        # Tabela de origens (referenciando enderecos)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS origens (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,7 +36,7 @@ class DBManager:
             )
         ''')
 
-        # Tabela de destinos (referenciando a tabela de enderecos)
+        # Tabela de destinos (referenciando enderecos)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS destinos (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,7 +99,9 @@ class DBManager:
         conn.commit()
         conn.close()
 
+    # --------------------------------------------------
     # Métodos para Endereços, Origens e Destinos
+    # --------------------------------------------------
 
     def inserir_endereco(self, cep, logradouro, complemento, bairro, localidade, uf, numero):
         """
@@ -180,7 +182,9 @@ class DBManager:
                    "bairro", "localidade", "uf", "numero"]
         return [dict(zip(columns, row)) for row in rows]
 
+    # --------------------------------------------------
     # Métodos para Carros, Motoristas e Tipos de Óleo
+    # --------------------------------------------------
 
     def inserir_carro(self, nome):
         conn = sqlite3.connect(self.db_path)
@@ -221,7 +225,23 @@ class DBManager:
         conn.close()
         return df
 
+    # --------------------------------------------------
+    # Método para excluir registro (evita erro ao excluir)
+    # --------------------------------------------------
+
+    def excluir_registro(self, tabela, registro_id):
+        """
+        Exclui um registro de 'tabela' pelo campo ID (chamado 'id').
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(f"DELETE FROM {tabela} WHERE id = ?", (registro_id,))
+        conn.commit()
+        conn.close()
+
+    # --------------------------------------------------
     # Métodos para Viagens
+    # --------------------------------------------------
 
     def inserir_viagem(self, origem_id, destino_id, carro, km_saida, km_chegada, total_km,
                        data_saida, data_volta, valor, motorista, diaria_motorista, despesa_extra,
@@ -258,8 +278,8 @@ class DBManager:
 
     def obter_viagens_completo(self):
         """
-        Retorna todas as viagens com os dados de endereço concatenados para origem e destino.
-        A concatenação une os campos: cep, logradouro, complemento, bairro, localidade, uf e número.
+        Retorna todas as viagens com os dados de endereço concatenados em duas colunas:
+        'origem' e 'destino'.
         """
         conn = sqlite3.connect(self.db_path)
         query = '''
