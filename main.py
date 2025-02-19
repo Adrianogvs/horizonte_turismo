@@ -5,10 +5,8 @@ from loguru import logger
 import sys
 import os
 
+# Função para limpar campos do st.session_state
 def limpar_campos(campos):
-    """
-    Remove as chaves informadas do st.session_state, limpando os valores dos widgets.
-    """
     for campo in campos:
         if campo in st.session_state:
             del st.session_state[campo]
@@ -21,7 +19,7 @@ logger.remove()
 logger.add(sys.stdout, level="INFO")
 logger.add("logs/app_log_{time}.log", level="INFO")
 
-# Imports internos
+# Imports internos – ajuste os caminhos conforme sua estrutura de pastas
 from src.auth.auth import AuthManager
 from src.database.db_manager import DBManager
 from src.utils.utils import to_excel_bytes
@@ -29,10 +27,9 @@ from src.utils.cep import consulta_cep
 
 logger.info("Iniciando a aplicação Streamlit")
 
-# --------------------------------------------------
-# FUNÇÕES DE CADASTRO SIMPLES (Carros, Motoristas, etc.)
-# --------------------------------------------------
-
+# -----------------------------
+# FUNÇÕES DE CADASTRO SIMPLES
+# -----------------------------
 def cadastro_carros(db: DBManager):
     st.subheader("Gerenciar Carros")
     user_name = st.session_state.get("user_name", "Desconhecido")
@@ -56,7 +53,6 @@ def cadastro_carros(db: DBManager):
         db.excluir_registro("carros", excluir_id)
         st.success("Carro excluído com sucesso!")
         logger.info(f"[EXCLUSAO] Carro excluído (ID={excluir_id}) por {user_name}")
-
 
 def cadastro_motoristas(db: DBManager):
     st.subheader("Gerenciar Motoristas")
@@ -82,7 +78,6 @@ def cadastro_motoristas(db: DBManager):
         st.success("Motorista excluído com sucesso!")
         logger.info(f"[EXCLUSAO] Motorista excluído (ID={excluir_id}) por {user_name}")
 
-
 def cadastro_tipos_oleo(db: DBManager):
     st.subheader("Gerenciar Tipos de Óleo")
     user_name = st.session_state.get("user_name", "Desconhecido")
@@ -107,11 +102,9 @@ def cadastro_tipos_oleo(db: DBManager):
         st.success("Óleo excluído com sucesso!")
         logger.info(f"[EXCLUSAO] Óleo excluído (ID={excluir_id}) por {user_name}")
 
-
-# --------------------------------------------------
-# FUNÇÕES DE CADASTRO DE ENDEREÇO (ORIGEM / DESTINO)
-# --------------------------------------------------
-
+# -----------------------------
+# FUNÇÕES DE CADASTRO DE ENDEREÇO
+# -----------------------------
 def cadastro_origem(db: DBManager):
     st.subheader("Cadastro de Origem (Endereço)")
     user_name = st.session_state.get("user_name", "Desconhecido")
@@ -182,10 +175,9 @@ def cadastro_destino(db: DBManager):
         if st.button("Limpar Campos", key="botao_limpar_destino"):
             limpar_campos(["destino_cep_input", "destino_numero_input"])
 
-# --------------------------------------------------
+# -----------------------------
 # FUNÇÃO PRINCIPAL
-# --------------------------------------------------
-
+# -----------------------------
 def main_app():
     db = DBManager()
 
@@ -197,6 +189,7 @@ def main_app():
 
     st.title("📌 Sistema de Gestão de Viagem - Horizonte Turismo")
 
+    # Define a variável user_role no escopo desta função
     user_role = st.session_state.get("role", "operator")
     logger.info(f"Usuário com papel {user_role} acessando a aplicação.")
 
@@ -210,16 +203,15 @@ def main_app():
     else:
         aba_principal = st.tabs(["Cadastro de Viagem"])[0]
 
-    # ========== ABA 1: Cadastro de Viagem ==========
+    # Aba 1: Cadastro de Viagem
     with aba_principal:
         st.subheader("Cadastro de Nova Viagem")
         user_name = st.session_state.get("user_name", "Desconhecido")
 
-        # Carrega as origens e destinos
+        # Carrega origens e destinos
         origens = db.obter_origens()
         destinos = db.obter_destinos()
 
-        # Concatena os campos do endereço para exibição no selectbox
         opcoes_origem = [
             f"{o['cep']} {o['logradouro']} {o['complemento']} {o['bairro']} {o['localidade']} {o['uf']} {o['numero']}"
             for o in origens
@@ -313,13 +305,12 @@ def main_app():
             st.number_input("Valor Total", value=computed_valor_total, format="%.2f",
                             key="viagem_valor_total", disabled=True)
 
-        # Se não houver origem/destino, desabilita o botão
+        # Habilita o botão somente se houver origem e destino
         can_save = (origem_id is not None) and (destino_id is not None)
 
         col_salvar, col_limpar = st.columns(2)
         with col_salvar:
             if st.button("Salvar Viagem", key="botao_salvar_viagem", disabled=(not can_save)):
-                # Insere a viagem
                 dados = (
                     origem_id, destino_id, carro,
                     km_saida, km_chegada, calculated_total_km,
@@ -333,9 +324,9 @@ def main_app():
                 logger.info(
                     f"[CADASTRO] Viagem registrada por {user_name}. "
                     f"OrigemID={origem_id}, DestinoID={destino_id}, Carro='{carro}', Motorista='{motorista}', "
-                    f"KM_Saida={km_saida}, KM_Chegada={km_chegada}, Valor={valor}, "
-                    f"Diaria={diaria_motorista}, DespesaExtra={despesa_extra}, DieselS10={diesel_s10}, DieselS500={diesel_s500}, "
-                    f"Litros={litros}, ValorComb={computed_valor_combustivel}, Pedagio={pedagio}, ValorTotal={computed_valor_total}"
+                    f"KM_Saída={km_saida}, KM_Chegada={km_chegada}, Valor={valor}, "
+                    f"Diária={diaria_motorista}, DespesaExtra={despesa_extra}, DieselS10={diesel_s10}, DieselS500={diesel_s500}, "
+                    f"Litros={litros}, ValorComb={computed_valor_combustivel}, Pedágio={pedagio}, ValorTotal={computed_valor_total}"
                 )
         with col_limpar:
             if st.button("Limpar Campos", key="botao_limpar_viagem"):
@@ -348,51 +339,52 @@ def main_app():
                     "viagem_diaria_motorista", "viagem_valor_total"
                 ])
 
-    # ========== ABA 2: Tabela de Viagens (Admin) ==========
+    # Aba 2: Tabela de Viagens (somente para admin)
     if user_role == "admin":
         with aba_tabela:
             st.subheader("📋 Viagens Registradas")
             df_viagens = db.obter_viagens_completo()
             if not df_viagens.empty:
-                df_viagens["data_saida"] = pd.to_datetime(df_viagens["data_saida"], errors="coerce")
+                # Converte a coluna "Data de Saída" para datetime
+                df_viagens["Data de Saída"] = pd.to_datetime(df_viagens["Data de Saída"], errors="coerce")
 
                 col1, col2, col3, col4, col5 = st.columns(5)
                 with col1:
-                    anos = sorted(df_viagens["data_saida"].dt.year.dropna().unique().tolist())
+                    anos = sorted(df_viagens["Data de Saída"].dt.year.dropna().unique().tolist())
                     anos_str = [str(a) for a in anos]
                     selected_ano = st.selectbox("Ano", ["Todos"] + anos_str, index=0, key="tabela_filtro_ano")
                 with col2:
-                    meses = sorted(df_viagens["data_saida"].dt.month.dropna().unique().tolist())
+                    meses = sorted(df_viagens["Data de Saída"].dt.month.dropna().unique().tolist())
                     meses_str = [str(m) for m in meses]
                     selected_mes = st.selectbox("Mês", ["Todos"] + meses_str, index=0, key="tabela_filtro_mes")
                 with col3:
-                    origens_list = sorted(df_viagens["origem"].dropna().unique().tolist())
+                    origens_list = sorted(df_viagens["Endereço de Origem"].dropna().unique().tolist())
                     selected_origem = st.selectbox("Origem", ["Todos"] + origens_list, index=0, key="tabela_filtro_origem")
                 with col4:
-                    destinos_list = sorted(df_viagens["destino"].dropna().unique().tolist())
+                    destinos_list = sorted(df_viagens["Endereço de Destino"].dropna().unique().tolist())
                     selected_destino = st.selectbox("Destino", ["Todos"] + destinos_list, index=0, key="tabela_filtro_destino")
                 with col5:
-                    motoristas_list = sorted(df_viagens["motorista"].dropna().unique().tolist())
+                    motoristas_list = sorted(df_viagens["Motorista"].dropna().unique().tolist())
                     selected_motorista = st.selectbox("Motorista", ["Todos"] + motoristas_list, index=0, key="tabela_filtro_motorista")
 
                 df_filtrado = df_viagens.copy()
                 if selected_ano != "Todos":
-                    df_filtrado = df_filtrado[df_filtrado["data_saida"].dt.year == int(selected_ano)]
+                    df_filtrado = df_filtrado[df_filtrado["Data de Saída"].dt.year == int(selected_ano)]
                 if selected_mes != "Todos":
-                    df_filtrado = df_filtrado[df_filtrado["data_saida"].dt.month == int(selected_mes)]
+                    df_filtrado = df_filtrado[df_filtrado["Data de Saída"].dt.month == int(selected_mes)]
                 if selected_origem != "Todos":
-                    df_filtrado = df_filtrado[df_filtrado["origem"] == selected_origem]
+                    df_filtrado = df_filtrado[df_filtrado["Endereço de Origem"] == selected_origem]
                 if selected_destino != "Todos":
-                    df_filtrado = df_filtrado[df_filtrado["destino"] == selected_destino]
+                    df_filtrado = df_filtrado[df_filtrado["Endereço de Destino"] == selected_destino]
                 if selected_motorista != "Todos":
-                    df_filtrado = df_filtrado[df_filtrado["motorista"] == selected_motorista]
+                    df_filtrado = df_filtrado[df_filtrado["Motorista"] == selected_motorista]
 
-                subtotal_total_km = df_filtrado["total_km"].sum()
-                subtotal_valor_total = df_filtrado["valor_total"].sum()
-                subtotal_valor_combustivel = df_filtrado["valor_combustivel"].sum()
-                subtotal_pedagio = df_filtrado["pedagio"].sum()
-                subtotal_despesa_extra = df_filtrado["despesa_extra"].sum()
-                subtotal_diaria = df_filtrado["diaria_motorista"].sum()
+                subtotal_total_km = df_filtrado["Total de KM"].sum()
+                subtotal_valor_total = df_filtrado["Valor Total da Viagem"].sum()
+                subtotal_valor_combustivel = df_filtrado["Valor do Combustível"].sum()
+                subtotal_pedagio = df_filtrado["Valor do Pedágio"].sum()
+                subtotal_despesa_extra = df_filtrado["Despesas Extras"].sum()
+                subtotal_diaria = df_filtrado["Diária do Motorista"].sum()
 
                 st.markdown("### Subtotais")
                 st.write(f"**Total KM:** {subtotal_total_km:,.2f}")
@@ -400,7 +392,7 @@ def main_app():
                 st.write(f"**Valor Combustível:** {subtotal_valor_combustivel:,.2f}")
                 st.write(f"**Pedágio:** {subtotal_pedagio:,.2f}")
                 st.write(f"**Despesa Extra:** {subtotal_despesa_extra:,.2f}")
-                st.write(f"**Diária Motorista:** {subtotal_diaria:,.2f}")
+                st.write(f"**Diária do Motorista:** {subtotal_diaria:,.2f}")
 
                 excel_data = to_excel_bytes(df_filtrado)
                 st.download_button(
@@ -411,11 +403,13 @@ def main_app():
                     key="tabela_botao_exportar_excel"
                 )
 
+                df_filtrado = df_filtrado.copy()
+                df_filtrado["Data de Saída"] = df_filtrado["Data de Saída"].dt.date
                 st.dataframe(df_filtrado)
             else:
                 st.info("Nenhuma viagem registrada ainda.")
 
-        # ========== ABA 3: Gráficos de Viagens ==========
+        # Aba 3: Gráficos de Viagens
         with aba_grafico:
             st.subheader("📊 Gráficos de Viagens")
             df_viagens = db.obter_viagens_completo()
@@ -428,26 +422,24 @@ def main_app():
                     "Evolução dos Custos de Viagem"
                 ])
                 with grafico_tab1:
-                    df_viagens["data_saida"] = pd.to_datetime(df_viagens["data_saida"])
-                    df_km = df_viagens.groupby("data_saida", as_index=False).agg({
-                        'total_km': 'sum',
-                        'valor_total': 'sum'
+                    df_viagens["Data de Saída"] = pd.to_datetime(df_viagens["Data de Saída"])
+                    df_km = df_viagens.groupby("Data de Saída", as_index=False).agg({
+                        'Total de KM': 'sum',
+                        'Valor Total da Viagem': 'sum'
                     })
-                    st.line_chart(df_km.set_index("data_saida")[['total_km', 'valor_total']])
+                    st.line_chart(df_km.set_index("Data de Saída")[['Total de KM', 'Valor Total da Viagem']])
                     st.write("Este gráfico mostra a evolução do Total de KM percorridos e do Valor Total das viagens ao longo do tempo. Identifique padrões sazonais e a relação entre o KM e os custos.")
-
                 with grafico_tab2:
                     custos = pd.DataFrame({
-                        "Categoria": ["Pedágio", "Despesa Extra", "Diária Motorista", "Valor Combustível"],
+                        "Categoria": ["Pedágio", "Despesa Extra", "Diária do Motorista", "Valor do Combustível"],
                         "Valor": [
-                            df_viagens["pedagio"].sum(),
-                            df_viagens["despesa_extra"].sum(),
-                            df_viagens["diaria_motorista"].sum(),
-                            df_viagens["valor_combustivel"].sum()
+                            df_viagens["Valor do Pedágio"].sum(),
+                            df_viagens["Despesas Extras"].sum(),
+                            df_viagens["Diária do Motorista"].sum(),
+                            df_viagens["Valor do Combustível"].sum()
                         ]
                     })
                     custos["Percentual"] = (custos["Valor"] / custos["Valor"].sum()) * 100
-                    import altair as alt
                     chart = alt.Chart(custos).mark_arc(innerRadius=50).encode(
                         theta=alt.Theta(field="Valor", type="quantitative"),
                         color=alt.Color(field="Categoria", type="nominal"),
@@ -459,37 +451,35 @@ def main_app():
                     ).properties(width=400, height=400)
                     st.altair_chart(chart, use_container_width=True)
                     st.write("A distribuição dos custos das viagens pode ajudar a identificar as áreas onde os recursos estão sendo mais consumidos. Analise o impacto de cada categoria de custo.")
-
                 with grafico_tab3:
                     chart_scatter = alt.Chart(df_viagens).mark_circle(size=60).encode(
-                        x=alt.X("total_km:Q", title="Total KM"),
-                        y=alt.Y("valor_total:Q", title="Valor Total"),
-                        color=alt.Color("origem:O", legend=alt.Legend(title="Origem")),
-                        size=alt.Size("valor_total:Q", legend=alt.Legend(title="Valor Total")),
-                        tooltip=["origem", "destino", "total_km", "valor_total"]
+                        x=alt.X("Total de KM:Q", title="Total KM"),
+                        y=alt.Y("Valor Total da Viagem:Q", title="Valor Total"),
+                        color=alt.Color("Endereço de Origem:O", legend=alt.Legend(title="Origem")),
+                        size=alt.Size("Valor Total da Viagem:Q", legend=alt.Legend(title="Valor Total")),
+                        tooltip=["Endereço de Origem", "Endereço de Destino", "Total de KM", "Valor Total da Viagem"]
                     ).interactive()
                     st.altair_chart(chart_scatter, use_container_width=True)
                     st.write("O gráfico de dispersão mostra a relação entre o Total de KM percorridos e o Valor Total das viagens. A segmentação por origem pode revelar padrões de custo e eficiência de cada região.")
-
                 with grafico_tab4:
                     chart_hist = alt.Chart(df_viagens).mark_bar().encode(
-                        alt.X("total_km:Q", bin=alt.Bin(maxbins=20), title="Total KM (binning)"),
+                        alt.X("Total de KM:Q", bin=alt.Bin(maxbins=20), title="Total KM (binning)"),
                         y=alt.Y("count():Q", title="Número de Viagens"),
-                        color=alt.Color("total_km:Q", scale=alt.Scale(scheme='greens'))
+                        color=alt.Color("Total de KM:Q", scale=alt.Scale(scheme='greens'))
                     ).properties(width=600, height=400)
                     st.altair_chart(chart_hist, use_container_width=True)
                     st.write("Este histograma mostra a distribuição do Total KM percorrido nas viagens. Pode ajudar a identificar os intervalos de distância mais frequentes e onde as viagens mais longas ou curtas predominam.")
-
                 with grafico_tab5:
-                    df_costos = df_viagens.groupby("data_saida")[
-                        ["pedagio", "despesa_extra", "diaria_motorista", "valor_combustivel"]
+                    # Alterado: usa "Data de Saída" em vez de "data_saida"
+                    df_costos = df_viagens.groupby("Data de Saída")[
+                        ["Valor do Pedágio", "Despesas Extras", "Diária do Motorista", "Valor do Combustível"]
                     ].sum().reset_index()
                     chart_area = alt.Chart(df_costos).mark_area().encode(
-                        x='data_saida:T',
-                        y=alt.Y('pedagio:Q', stack='zero', title="Custo Total"),
+                        x='Data de Saída:T',
+                        y=alt.Y('Valor do Pedágio:Q', stack='zero', title="Custo Total"),
                         color=alt.Color('variable:N', title="Categoria de Custo"),
                     ).transform_fold(
-                        ['pedagio', 'despesa_extra', 'diaria_motorista', 'valor_combustivel'],
+                        ['Valor do Pedágio', 'Despesas Extras', 'Diária do Motorista', 'Valor do Combustível'],
                         as_=['variable', 'value']
                     ).properties(
                         title="Evolução dos Custos de Viagem ao Longo do Tempo",
@@ -501,7 +491,7 @@ def main_app():
             else:
                 st.info("Nenhuma viagem registrada ainda.")
 
-        # ========== ABA 4: Cadastros ==========
+        # Aba 4: Cadastros
         with aba_cadastros:
             st.subheader("Cadastro de Dados")
             tab1, tab2, tab3, tab4, tab5 = st.tabs([

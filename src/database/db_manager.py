@@ -99,14 +99,8 @@ class DBManager:
         conn.commit()
         conn.close()
 
-    # --------------------------------------------------
     # Métodos para Endereços, Origens e Destinos
-    # --------------------------------------------------
-
     def inserir_endereco(self, cep, logradouro, complemento, bairro, localidade, uf, numero):
-        """
-        Insere um registro na tabela 'enderecos' e retorna o ID gerado.
-        """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('''
@@ -119,9 +113,6 @@ class DBManager:
         return last_id
 
     def inserir_origem(self, endereco_id):
-        """
-        Insere um registro na tabela 'origens', referenciando o endereço.
-        """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('INSERT INTO origens (endereco_id) VALUES (?)', (endereco_id,))
@@ -131,9 +122,6 @@ class DBManager:
         return origem_id
 
     def inserir_destino(self, endereco_id):
-        """
-        Insere um registro na tabela 'destinos', referenciando o endereço.
-        """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('INSERT INTO destinos (endereco_id) VALUES (?)', (endereco_id,))
@@ -143,9 +131,6 @@ class DBManager:
         return destino_id
 
     def obter_origens(self):
-        """
-        Retorna as origens com os dados do endereço (join entre origens e enderecos).
-        """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('''
@@ -163,9 +148,6 @@ class DBManager:
         return [dict(zip(columns, row)) for row in rows]
 
     def obter_destinos(self):
-        """
-        Retorna os destinos com os dados do endereço (join entre destinos e enderecos).
-        """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('''
@@ -182,10 +164,7 @@ class DBManager:
                    "bairro", "localidade", "uf", "numero"]
         return [dict(zip(columns, row)) for row in rows]
 
-    # --------------------------------------------------
     # Métodos para Carros, Motoristas e Tipos de Óleo
-    # --------------------------------------------------
-
     def inserir_carro(self, nome):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -225,30 +204,18 @@ class DBManager:
         conn.close()
         return df
 
-    # --------------------------------------------------
-    # Método para excluir registro (evita erro ao excluir)
-    # --------------------------------------------------
-
+    # Método para excluir registro
     def excluir_registro(self, tabela, registro_id):
-        """
-        Exclui um registro de 'tabela' pelo campo ID (chamado 'id').
-        """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute(f"DELETE FROM {tabela} WHERE id = ?", (registro_id,))
         conn.commit()
         conn.close()
 
-    # --------------------------------------------------
     # Métodos para Viagens
-    # --------------------------------------------------
-
     def inserir_viagem(self, origem_id, destino_id, carro, km_saida, km_chegada, total_km,
                        data_saida, data_volta, valor, motorista, diaria_motorista, despesa_extra,
                        diesel_s10, diesel_s500, litros, valor_combustivel, pedagio, valor_total):
-        """
-        Insere um registro na tabela 'viagens', referenciando as origens e destinos.
-        """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('''
@@ -268,9 +235,6 @@ class DBManager:
         conn.close()
 
     def obter_viagens(self):
-        """
-        Retorna todas as viagens cadastradas (sem JOIN).
-        """
         conn = sqlite3.connect(self.db_path)
         df = pd.read_sql('SELECT * FROM viagens', conn)
         conn.close()
@@ -278,35 +242,37 @@ class DBManager:
 
     def obter_viagens_completo(self):
         """
-        Retorna todas as viagens com os dados de endereço concatenados em duas colunas:
-        'origem' e 'destino'.
+        Retorna todas as viagens com os dados de endereço concatenados.
+        Os aliases utilizam nomes com espaços para exibição.
         """
         conn = sqlite3.connect(self.db_path)
         query = '''
-                SELECT 
-                v.carro, 
-                v.km_saida, 
-                v.km_chegada, 
-                v.total_km, 
-                v.data_saida, 
-                v.data_volta, 
-                v.valor, 
-                v.motorista, 
-                v.diaria_motorista, 
-                v.despesa_extra, 
-                v.diesel_s10, 
-                v.diesel_s500, 
-                v.litros, 
-                v.valor_combustivel, 
-                v.pedagio, 
-                v.valor_total,
-                (e1.cep || ' ' || e1.logradouro || ' ' || COALESCE(e1.complemento, '') || ' ' || e1.bairro || ' ' || e1.localidade || ' ' || e1.uf || ' ' || e1.numero) AS origem,
-                (e2.cep || ' ' || e2.logradouro || ' ' || COALESCE(e2.complemento, '') || ' ' || e2.bairro || ' ' || e2.localidade || ' ' || e2.uf || ' ' || e2.numero) AS destino
-                FROM viagens v
-                LEFT JOIN origens o ON v.origem_id = o.id
-                LEFT JOIN enderecos e1 ON o.endereco_id = e1.id
-                LEFT JOIN destinos d ON v.destino_id = d.id
-                LEFT JOIN enderecos e2 ON d.endereco_id = e2.id
+            SELECT 
+               v.carro AS "Carro",
+               v.km_saida AS "Quilometragem de Saída",
+               v.km_chegada AS "Quilometragem de Chegada",
+               v.total_km AS "Total de KM",
+               v.data_saida AS "Data de Saída",
+               v.data_volta AS "Data de Retorno",
+               v.valor AS "Valor da Viagem",
+               v.motorista AS "Motorista",
+               v.diaria_motorista AS "Diária do Motorista",
+               v.despesa_extra AS "Despesas Extras",
+               v.diesel_s10 AS "Diesel S10 (Litros)",
+               v.diesel_s500 AS "Diesel S500 (Litros)",
+               v.litros AS "Total de Combustível (Litros)",
+               v.valor_combustivel AS "Valor do Combustível",
+               v.pedagio AS "Valor do Pedágio",
+               v.valor_total AS "Valor Total da Viagem",
+               (e1.cep || ', ' || e1.logradouro || ', ' || COALESCE(e1.complemento, '') || ', ' || 
+                e1.bairro || ', ' || e1.localidade || ', ' || e1.uf || ', ' || e1.numero) AS "Endereço de Origem",
+               (e2.cep || ', ' || e2.logradouro || ', ' || COALESCE(e2.complemento, '') || ', ' || 
+                e2.bairro || ', ' || e2.localidade || ', ' || e2.uf || ', ' || e2.numero) AS "Endereço de Destino"
+            FROM viagens v
+            LEFT JOIN origens o ON v.origem_id = o.id
+            LEFT JOIN enderecos e1 ON o.endereco_id = e1.id
+            LEFT JOIN destinos d ON v.destino_id = d.id
+            LEFT JOIN enderecos e2 ON d.endereco_id = e2.id
         '''
         df = pd.read_sql(query, conn)
         conn.close()
