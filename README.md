@@ -1,5 +1,5 @@
 
-# 🚗 **Sistema de Gestão de Viagem - Horizonte Turismo** 🌍
+# 🚗 **Sistema de Gestão de Viagem - Horizonte Turismo**
 
 Bem-vindo ao repositório do **Sistema de Gestão de Viagem**, uma plataforma desenvolvida com **Streamlit**, **SQLite3**, **pandas**, e **Altair**. Este sistema permite gerenciar as viagens de forma eficiente, com funcionalidades para registrar, visualizar e analisar informações relacionadas a **carros**, **motoristas**, **viagens**, **origens e destinos** e **custos**.
 
