@@ -463,21 +463,47 @@ def main_app():
         st.subheader("📊 Gráficos de Viagens")
         df_viagens = db.obter_viagens_completo()
         if not df_viagens.empty:
-            grafico_tab1, grafico_tab2, grafico_tab3, grafico_tab4, grafico_tab5 = st.tabs([
-                "Total KM por Data",
+            # Garantir que a coluna de data seja do tipo datetime
+            df_viagens["Data de Saída"] = pd.to_datetime(df_viagens["Data de Saída"], errors="coerce")
+            
+            # Cria seis abas para os gráficos
+            grafico_tab1, grafico_tab2, grafico_tab3, grafico_tab4, grafico_tab5, grafico_tab6 = st.tabs([
+                "Total KM & Custos por Data",
                 "Distribuição dos Custos",
                 "Valor Total x Total KM",
                 "Histograma de Total KM",
-                "Evolução dos Custos de Viagem"
+                "Evolução dos Custos",
+                "Previsão de Viagens Futuras"
             ])
+            
+            # Gráfico 1: Linha para Total KM, Valor Total e Valor do Combustível por Data
             with grafico_tab1:
-                df_viagens["Data de Saída"] = pd.to_datetime(df_viagens["Data de Saída"])
-                df_km = df_viagens.groupby("Data de Saída", as_index=False).agg({
-                    'Total de KM': 'sum',
-                    'Valor Total da Viagem': 'sum'
+                df_grouped = df_viagens.groupby("Data de Saída", as_index=False).agg({
+                    "Total de KM": "sum",
+                    "Valor Total da Viagem": "sum",
+                    "Valor do Combustível": "sum"
                 })
-                st.line_chart(df_km.set_index("Data de Saída")[['Total de KM', 'Valor Total da Viagem']])
-                st.write("Este gráfico mostra a evolução do Total de KM percorridos e do Valor Total das viagens ao longo do tempo. Identifique padrões sazonais e a relação entre o KM e os custos.")
+                # Reestruturar os dados para plotagem
+                df_melted = df_grouped.melt(
+                    id_vars="Data de Saída", 
+                    value_vars=["Total de KM", "Valor Total da Viagem", "Valor do Combustível"],
+                    var_name="Métrica", 
+                    value_name="Valor"
+                )
+                chart1 = alt.Chart(df_melted).mark_line(point=True).encode(
+                    x=alt.X("Data de Saída:T", title="Data"),
+                    y=alt.Y("Valor:Q", title="Valor / KM"),
+                    color=alt.Color("Métrica:N"),
+                    tooltip=["Data de Saída:T", "Métrica:N", "Valor:Q"]
+                ).properties(
+                    title="Evolução Diária: Total KM, Valor Total e Valor do Combustível",
+                    width=700,
+                    height=400
+                )
+                st.altair_chart(chart1, use_container_width=True)
+                st.write("Este gráfico mostra a evolução diária do Total de KM percorridos, do Valor Total das viagens e do Valor do Combustível, permitindo identificar tendências e sazonalidades.")
+            
+            # Gráfico 2: Distribuição dos Custos (pizza)
             with grafico_tab2:
                 custos = pd.DataFrame({
                     "Categoria": ["Pedágio", "Despesa Extra", "Diária do Motorista", "Valor do Combustível"],
@@ -489,55 +515,122 @@ def main_app():
                     ]
                 })
                 custos["Percentual"] = (custos["Valor"] / custos["Valor"].sum()) * 100
-                chart = alt.Chart(custos).mark_arc(innerRadius=50).encode(
+                chart2 = alt.Chart(custos).mark_arc(innerRadius=50).encode(
                     theta=alt.Theta(field="Valor", type="quantitative"),
                     color=alt.Color(field="Categoria", type="nominal"),
-                    tooltip=[
-                        alt.Tooltip(field="Categoria", type="nominal"),
-                        alt.Tooltip(field="Valor", type="quantitative"),
-                        alt.Tooltip(field="Percentual", type="quantitative")
-                    ]
-                ).properties(width=400, height=400)
-                st.altair_chart(chart, use_container_width=True)
-                st.write("A distribuição dos custos das viagens pode ajudar a identificar as áreas onde os recursos estão sendo mais consumidos. Analise o impacto de cada categoria de custo.")
+                    tooltip=[alt.Tooltip("Categoria:N"), alt.Tooltip("Valor:Q"), alt.Tooltip("Percentual:Q")]
+                ).properties(
+                    title="Distribuição Percentual dos Custos",
+                    width=400,
+                    height=400
+                )
+                st.altair_chart(chart2, use_container_width=True)
+                st.write("Este gráfico analisa a distribuição percentual dos custos das viagens, evidenciando onde os recursos estão sendo mais consumidos.")
+            
+            # Gráfico 3: Dispersão entre Total KM e Valor Total com bubble size representando Valor do Combustível
             with grafico_tab3:
-                chart_scatter = alt.Chart(df_viagens).mark_circle(size=60).encode(
+                chart3 = alt.Chart(df_viagens).mark_circle().encode(
                     x=alt.X("Total de KM:Q", title="Total KM"),
                     y=alt.Y("Valor Total da Viagem:Q", title="Valor Total"),
-                    color=alt.Color("Endereço de Origem:O", legend=alt.Legend(title="Origem")),
-                    size=alt.Size("Valor Total da Viagem:Q", legend=alt.Legend(title="Valor Total")),
-                    tooltip=["Endereço de Origem", "Endereço de Destino", "Total de KM", "Valor Total da Viagem"]
+                    size=alt.Size("Valor do Combustível:Q", title="Valor do Combustível"),
+                    color=alt.Color("Endereço de Origem:N", title="Origem"),
+                    tooltip=["Endereço de Origem", "Endereço de Destino", "Total de KM", "Valor Total da Viagem", "Valor do Combustível"]
+                ).properties(
+                    title="Relação: Total KM x Valor Total (tamanho = Valor do Combustível)",
+                    width=700,
+                    height=400
                 ).interactive()
-                st.altair_chart(chart_scatter, use_container_width=True)
-                st.write("O gráfico de dispersão mostra a relação entre o Total de KM percorridos e o Valor Total das viagens. A segmentação por origem pode revelar padrões de custo e eficiência de cada região.")
+                st.altair_chart(chart3, use_container_width=True)
+                st.write("Este gráfico de dispersão relaciona o Total de KM com o Valor Total das viagens, utilizando o tamanho dos pontos para indicar o Valor do Combustível, o que pode revelar oportunidades de melhoria e eficiência operacional.")
+            
+            # Gráfico 4: Histograma do Total de KM
             with grafico_tab4:
-                chart_hist = alt.Chart(df_viagens).mark_bar().encode(
-                    alt.X("Total de KM:Q", bin=alt.Bin(maxbins=20), title="Total KM (binning)"),
+                chart4 = alt.Chart(df_viagens).mark_bar().encode(
+                    alt.X("Total de KM:Q", bin=alt.Bin(maxbins=20), title="Intervalos de Total KM"),
                     y=alt.Y("count():Q", title="Número de Viagens"),
                     color=alt.Color("Total de KM:Q", scale=alt.Scale(scheme='greens'))
-                ).properties(width=600, height=400)
-                st.altair_chart(chart_hist, use_container_width=True)
-                st.write("Este histograma mostra a distribuição do Total KM percorrido nas viagens. Pode ajudar a identificar os intervalos de distância mais frequentes e onde as viagens mais longas ou curtas predominam.")
+                ).properties(
+                    title="Distribuição do Total de KM por Viagem",
+                    width=700,
+                    height=400
+                )
+                st.altair_chart(chart4, use_container_width=True)
+                st.write("Este histograma mostra como as viagens se distribuem em relação à distância percorrida, destacando os intervalos mais comuns.")
+            
+            # Gráfico 5: Evolução dos Custos de Viagem (área empilhada)
             with grafico_tab5:
                 df_costos = df_viagens.groupby("Data de Saída")[
                     ["Valor do Pedágio", "Despesas Extras", "Diária do Motorista", "Valor do Combustível"]
                 ].sum().reset_index()
-                chart_area = alt.Chart(df_costos).mark_area().encode(
-                    x='Data de Saída:T',
-                    y=alt.Y('Valor do Pedágio:Q', stack='zero', title="Custo Total"),
+                chart5 = alt.Chart(df_costos).mark_area().encode(
+                    x=alt.X('Data de Saída:T', title="Data"),
+                    y=alt.Y('value:Q', stack='zero', title="Custo Total"),
                     color=alt.Color('variable:N', title="Categoria de Custo"),
+                    tooltip=["Data de Saída:T", "variable:N", "value:Q"]
                 ).transform_fold(
                     ['Valor do Pedágio', 'Despesas Extras', 'Diária do Motorista', 'Valor do Combustível'],
                     as_=['variable', 'value']
                 ).properties(
-                    title="Evolução dos Custos de Viagem ao Longo do Tempo",
+                    title="Evolução dos Custos das Viagens ao Longo do Tempo",
                     width=800,
                     height=400
                 )
-                st.altair_chart(chart_area, use_container_width=True)
-                st.write("Este gráfico de área empilhada mostra a evolução dos custos de viagem ao longo do tempo. A segmentação por categoria de custo revela como cada tipo de custo contribui para o custo total das viagens ao longo dos dias.")
+                st.altair_chart(chart5, use_container_width=True)
+                st.write("O gráfico de área empilhada ilustra a evolução dos diferentes custos das viagens ao longo do tempo, possibilitando identificar tendências e sazonalidades em cada categoria.")
+            
+            # Gráfico 6: Previsão de Viagens Futuras com Regressão Linear Simples
+            with grafico_tab6:
+                import numpy as np
+                import datetime
+                
+                # Agrupa por data e conta o número de viagens
+                df_grouped = df_viagens.groupby("Data de Saída").size().reset_index(name="NumViagens")
+                df_grouped = df_grouped.sort_values("Data de Saída")
+                
+                # Converte a data para um número ordinal para ajuste de regressão
+                df_grouped["date_ord"] = df_grouped["Data de Saída"].apply(lambda d: d.toordinal())
+                
+                # Se houver dados suficientes, ajusta uma regressão linear
+                if len(df_grouped) >= 2:
+                    coef = np.polyfit(df_grouped["date_ord"], df_grouped["NumViagens"], 1)
+                    poly_model = np.poly1d(coef)
+                    
+                    # Gera datas futuras para os próximos 30 dias
+                    max_date = df_grouped["Data de Saída"].max()
+                    future_dates = [max_date + datetime.timedelta(days=i) for i in range(1, 31)]
+                    future_ord = [d.toordinal() for d in future_dates]
+                    future_predictions = poly_model(future_ord)
+                    
+                    df_forecast = pd.DataFrame({
+                        "Data": future_dates,
+                        "Previsao": future_predictions
+                    })
+                    
+                    # Dados históricos para comparação
+                    df_grouped_hist = df_grouped.rename(columns={"Data de Saída": "Data", "NumViagens": "Histórico"})
+                    
+                    line_hist = alt.Chart(df_grouped_hist).mark_line(color="blue").encode(
+                        x=alt.X("Data:T", title="Data"),
+                        y=alt.Y("Histórico:Q", title="Número de Viagens"),
+                        tooltip=["Data:T", "Histórico:Q"]
+                    )
+                    line_forecast = alt.Chart(df_forecast).mark_line(color="red", strokeDash=[5,5]).encode(
+                        x=alt.X("Data:T", title="Data"),
+                        y=alt.Y("Previsao:Q", title="Número de Viagens"),
+                        tooltip=["Data:T", "Previsao:Q"]
+                    )
+                    combined_chart = alt.layer(line_hist, line_forecast).properties(
+                        title="Previsão de Número de Viagens Futuras (Próximos 30 dias)",
+                        width=800,
+                        height=400
+                    )
+                    st.altair_chart(combined_chart, use_container_width=True)
+                    st.write("Este gráfico mostra a tendência histórica do número de viagens (linha azul) e uma previsão linear para os próximos 30 dias (linha vermelha tracejada). Essa análise pode auxiliar na definição de estratégias para aumentar a quantidade de viagens.")
+                else:
+                    st.info("Não há dados suficientes para gerar uma previsão.")
         else:
             st.info("Nenhuma viagem registrada ainda.")
+
 
     # Aba 4: Cadastros
     with aba_cadastros:
