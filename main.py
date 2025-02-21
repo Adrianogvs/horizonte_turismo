@@ -4,6 +4,7 @@ import altair as alt
 from loguru import logger
 import sys
 import os
+from io import BytesIO
 
 # Função para limpar campos do st.session_state
 def limpar_campos(campos):
@@ -22,8 +23,15 @@ logger.add("logs/app_log_{time}.log", level="INFO")
 # Imports internos – ajuste os caminhos conforme sua estrutura de pastas
 from src.auth.auth import AuthManager
 from src.database.db_manager import DBManager
-from src.utils.utils import to_excel_bytes
 from src.utils.cep import consulta_cep
+
+# Função para exportar DataFrame para Excel em bytes (correção aplicada)
+def to_excel_bytes(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False)
+    processed_data = output.getvalue()
+    return processed_data
 
 logger.info("Iniciando a aplicação Streamlit")
 
@@ -285,7 +293,8 @@ def main_app():
         with row4[1]:
             diesel_s500 = st.number_input("Diesel S500", min_value=0.0, format="%.2f", key="viagem_diesel_s500")
         with row4[2]:
-            litros = st.number_input("Litros", min_value=0.0, format="%.2f", key="viagem_litros")
+            litros = diesel_s10 + diesel_s500
+            st.number_input("Litros", min_value=0.0, format="%.2f", key="viagem_litros", value=litros, disabled=True)
 
         row5 = st.columns(3)
         with row5[0]:
@@ -301,7 +310,8 @@ def main_app():
         with row6[0]:
             diaria_motorista = st.number_input("Diária Motorista", min_value=0.0, format="%.2f", key="viagem_diaria_motorista")
         with row6[1]:
-            computed_valor_total = computed_valor_combustivel + despesa_extra + diaria_motorista
+            # Atualize o cálculo para incluir o Pedágio
+            computed_valor_total = computed_valor_combustivel + despesa_extra + diaria_motorista + pedagio
             st.number_input("Valor Total", value=computed_valor_total, format="%.2f",
                             key="viagem_valor_total", disabled=True)
 
@@ -343,30 +353,63 @@ def main_app():
     if user_role == "admin":
         with aba_tabela:
             st.subheader("📋 Viagens Registradas")
-            df_viagens = db.obter_viagens_completo()
-            if not df_viagens.empty:
-                # Converte a coluna "Data de Saída" para datetime
-                df_viagens["Data de Saída"] = pd.to_datetime(df_viagens["Data de Saída"], errors="coerce")
 
+            # Carrega o DataFrame completo do banco de dados
+            df_viagens = db.obter_viagens_completo()
+
+            if not df_viagens.empty:
+                # 1) Converter colunas relevantes para numérico
+                numeric_cols = [
+                    "Total de KM",
+                    "Valor Total da Viagem",
+                    "Valor do Combustível",
+                    "Valor do Pedágio",
+                    "Despesas Extras",
+                    "Diária do Motorista"
+                ]
+                for col in numeric_cols:
+                    if col in df_viagens.columns:
+                        df_viagens[col] = pd.to_numeric(df_viagens[col], errors="coerce")
+
+                # 2) Converter a coluna "Data de Saída" para datetime
+                if "Data de Saída" in df_viagens.columns:
+                    df_viagens["Data de Saída"] = pd.to_datetime(df_viagens["Data de Saída"], errors="coerce")
+
+                # Atualiza o campo "Valor Total da Viagem" para incluir o Pedágio
+                if all(col in df_viagens.columns for col in ["Valor do Combustível", "Valor do Pedágio", "Despesas Extras", "Diária do Motorista"]):
+                    df_viagens["Valor Total da Viagem"] = (
+                        df_viagens["Valor do Combustível"] +
+                        df_viagens["Valor do Pedágio"] +
+                        df_viagens["Despesas Extras"] +
+                        df_viagens["Diária do Motorista"]
+                    )
+
+                # 3) Criar filtros (Ano, Mês, Origem, Destino, Motorista)
                 col1, col2, col3, col4, col5 = st.columns(5)
+
                 with col1:
                     anos = sorted(df_viagens["Data de Saída"].dt.year.dropna().unique().tolist())
                     anos_str = [str(a) for a in anos]
                     selected_ano = st.selectbox("Ano", ["Todos"] + anos_str, index=0, key="tabela_filtro_ano")
+
                 with col2:
                     meses = sorted(df_viagens["Data de Saída"].dt.month.dropna().unique().tolist())
                     meses_str = [str(m) for m in meses]
                     selected_mes = st.selectbox("Mês", ["Todos"] + meses_str, index=0, key="tabela_filtro_mes")
+
                 with col3:
                     origens_list = sorted(df_viagens["Endereço de Origem"].dropna().unique().tolist())
                     selected_origem = st.selectbox("Origem", ["Todos"] + origens_list, index=0, key="tabela_filtro_origem")
+
                 with col4:
                     destinos_list = sorted(df_viagens["Endereço de Destino"].dropna().unique().tolist())
                     selected_destino = st.selectbox("Destino", ["Todos"] + destinos_list, index=0, key="tabela_filtro_destino")
+
                 with col5:
                     motoristas_list = sorted(df_viagens["Motorista"].dropna().unique().tolist())
                     selected_motorista = st.selectbox("Motorista", ["Todos"] + motoristas_list, index=0, key="tabela_filtro_motorista")
 
+                # 4) Aplicar os filtros ao DataFrame
                 df_filtrado = df_viagens.copy()
                 if selected_ano != "Todos":
                     df_filtrado = df_filtrado[df_filtrado["Data de Saída"].dt.year == int(selected_ano)]
@@ -379,6 +422,7 @@ def main_app():
                 if selected_motorista != "Todos":
                     df_filtrado = df_filtrado[df_filtrado["Motorista"] == selected_motorista]
 
+                # 5) Calcular subtotais
                 subtotal_total_km = df_filtrado["Total de KM"].sum()
                 subtotal_valor_total = df_filtrado["Valor Total da Viagem"].sum()
                 subtotal_valor_combustivel = df_filtrado["Valor do Combustível"].sum()
@@ -386,6 +430,7 @@ def main_app():
                 subtotal_despesa_extra = df_filtrado["Despesas Extras"].sum()
                 subtotal_diaria = df_filtrado["Diária do Motorista"].sum()
 
+                # 6) Exibir subtotais
                 st.markdown("### Subtotais")
                 st.write(f"**Total KM:** {subtotal_total_km:,.2f}")
                 st.write(f"**Valor Total:** {subtotal_valor_total:,.2f}")
@@ -394,6 +439,7 @@ def main_app():
                 st.write(f"**Despesa Extra:** {subtotal_despesa_extra:,.2f}")
                 st.write(f"**Diária do Motorista:** {subtotal_diaria:,.2f}")
 
+                # 7) Exportar o DataFrame filtrado para Excel
                 excel_data = to_excel_bytes(df_filtrado)
                 st.download_button(
                     label="Exportar para Excel",
@@ -403,114 +449,116 @@ def main_app():
                     key="tabela_botao_exportar_excel"
                 )
 
-                df_filtrado = df_filtrado.copy()
+                # 8) Ajustar a exibição da coluna Data de Saída (somente a data, sem hora)
                 df_filtrado["Data de Saída"] = df_filtrado["Data de Saída"].dt.date
+
+                # 9) Exibir o DataFrame filtrado
                 st.dataframe(df_filtrado)
+
             else:
                 st.info("Nenhuma viagem registrada ainda.")
 
-        # Aba 3: Gráficos de Viagens
-        with aba_grafico:
-            st.subheader("📊 Gráficos de Viagens")
-            df_viagens = db.obter_viagens_completo()
-            if not df_viagens.empty:
-                grafico_tab1, grafico_tab2, grafico_tab3, grafico_tab4, grafico_tab5 = st.tabs([
-                    "Total KM por Data",
-                    "Distribuição dos Custos",
-                    "Valor Total x Total KM",
-                    "Histograma de Total KM",
-                    "Evolução dos Custos de Viagem"
-                ])
-                with grafico_tab1:
-                    df_viagens["Data de Saída"] = pd.to_datetime(df_viagens["Data de Saída"])
-                    df_km = df_viagens.groupby("Data de Saída", as_index=False).agg({
-                        'Total de KM': 'sum',
-                        'Valor Total da Viagem': 'sum'
-                    })
-                    st.line_chart(df_km.set_index("Data de Saída")[['Total de KM', 'Valor Total da Viagem']])
-                    st.write("Este gráfico mostra a evolução do Total de KM percorridos e do Valor Total das viagens ao longo do tempo. Identifique padrões sazonais e a relação entre o KM e os custos.")
-                with grafico_tab2:
-                    custos = pd.DataFrame({
-                        "Categoria": ["Pedágio", "Despesa Extra", "Diária do Motorista", "Valor do Combustível"],
-                        "Valor": [
-                            df_viagens["Valor do Pedágio"].sum(),
-                            df_viagens["Despesas Extras"].sum(),
-                            df_viagens["Diária do Motorista"].sum(),
-                            df_viagens["Valor do Combustível"].sum()
-                        ]
-                    })
-                    custos["Percentual"] = (custos["Valor"] / custos["Valor"].sum()) * 100
-                    chart = alt.Chart(custos).mark_arc(innerRadius=50).encode(
-                        theta=alt.Theta(field="Valor", type="quantitative"),
-                        color=alt.Color(field="Categoria", type="nominal"),
-                        tooltip=[
-                            alt.Tooltip(field="Categoria", type="nominal"),
-                            alt.Tooltip(field="Valor", type="quantitative"),
-                            alt.Tooltip(field="Percentual", type="quantitative")
-                        ]
-                    ).properties(width=400, height=400)
-                    st.altair_chart(chart, use_container_width=True)
-                    st.write("A distribuição dos custos das viagens pode ajudar a identificar as áreas onde os recursos estão sendo mais consumidos. Analise o impacto de cada categoria de custo.")
-                with grafico_tab3:
-                    chart_scatter = alt.Chart(df_viagens).mark_circle(size=60).encode(
-                        x=alt.X("Total de KM:Q", title="Total KM"),
-                        y=alt.Y("Valor Total da Viagem:Q", title="Valor Total"),
-                        color=alt.Color("Endereço de Origem:O", legend=alt.Legend(title="Origem")),
-                        size=alt.Size("Valor Total da Viagem:Q", legend=alt.Legend(title="Valor Total")),
-                        tooltip=["Endereço de Origem", "Endereço de Destino", "Total de KM", "Valor Total da Viagem"]
-                    ).interactive()
-                    st.altair_chart(chart_scatter, use_container_width=True)
-                    st.write("O gráfico de dispersão mostra a relação entre o Total de KM percorridos e o Valor Total das viagens. A segmentação por origem pode revelar padrões de custo e eficiência de cada região.")
-                with grafico_tab4:
-                    chart_hist = alt.Chart(df_viagens).mark_bar().encode(
-                        alt.X("Total de KM:Q", bin=alt.Bin(maxbins=20), title="Total KM (binning)"),
-                        y=alt.Y("count():Q", title="Número de Viagens"),
-                        color=alt.Color("Total de KM:Q", scale=alt.Scale(scheme='greens'))
-                    ).properties(width=600, height=400)
-                    st.altair_chart(chart_hist, use_container_width=True)
-                    st.write("Este histograma mostra a distribuição do Total KM percorrido nas viagens. Pode ajudar a identificar os intervalos de distância mais frequentes e onde as viagens mais longas ou curtas predominam.")
-                with grafico_tab5:
-                    # Alterado: usa "Data de Saída" em vez de "data_saida"
-                    df_costos = df_viagens.groupby("Data de Saída")[
-                        ["Valor do Pedágio", "Despesas Extras", "Diária do Motorista", "Valor do Combustível"]
-                    ].sum().reset_index()
-                    chart_area = alt.Chart(df_costos).mark_area().encode(
-                        x='Data de Saída:T',
-                        y=alt.Y('Valor do Pedágio:Q', stack='zero', title="Custo Total"),
-                        color=alt.Color('variable:N', title="Categoria de Custo"),
-                    ).transform_fold(
-                        ['Valor do Pedágio', 'Despesas Extras', 'Diária do Motorista', 'Valor do Combustível'],
-                        as_=['variable', 'value']
-                    ).properties(
-                        title="Evolução dos Custos de Viagem ao Longo do Tempo",
-                        width=800,
-                        height=400
-                    )
-                    st.altair_chart(chart_area, use_container_width=True)
-                    st.write("Este gráfico de área empilhada mostra a evolução dos custos de viagem ao longo do tempo. A segmentação por categoria de custo revela como cada tipo de custo contribui para o custo total das viagens ao longo dos dias.")
-            else:
-                st.info("Nenhuma viagem registrada ainda.")
-
-        # Aba 4: Cadastros
-        with aba_cadastros:
-            st.subheader("Cadastro de Dados")
-            tab1, tab2, tab3, tab4, tab5 = st.tabs([
-                "Carros",
-                "Origens",
-                "Destinos",
-                "Tipos de Óleo",
-                "Motoristas"
+    # Aba 3: Gráficos de Viagens
+    with aba_grafico:
+        st.subheader("📊 Gráficos de Viagens")
+        df_viagens = db.obter_viagens_completo()
+        if not df_viagens.empty:
+            grafico_tab1, grafico_tab2, grafico_tab3, grafico_tab4, grafico_tab5 = st.tabs([
+                "Total KM por Data",
+                "Distribuição dos Custos",
+                "Valor Total x Total KM",
+                "Histograma de Total KM",
+                "Evolução dos Custos de Viagem"
             ])
-            with tab1:
-                cadastro_carros(db)
-            with tab2:
-                cadastro_origem(db)
-            with tab3:
-                cadastro_destino(db)
-            with tab4:
-                cadastro_tipos_oleo(db)
-            with tab5:
-                cadastro_motoristas(db)
+            with grafico_tab1:
+                df_viagens["Data de Saída"] = pd.to_datetime(df_viagens["Data de Saída"])
+                df_km = df_viagens.groupby("Data de Saída", as_index=False).agg({
+                    'Total de KM': 'sum',
+                    'Valor Total da Viagem': 'sum'
+                })
+                st.line_chart(df_km.set_index("Data de Saída")[['Total de KM', 'Valor Total da Viagem']])
+                st.write("Este gráfico mostra a evolução do Total de KM percorridos e do Valor Total das viagens ao longo do tempo. Identifique padrões sazonais e a relação entre o KM e os custos.")
+            with grafico_tab2:
+                custos = pd.DataFrame({
+                    "Categoria": ["Pedágio", "Despesa Extra", "Diária do Motorista", "Valor do Combustível"],
+                    "Valor": [
+                        df_viagens["Valor do Pedágio"].sum(),
+                        df_viagens["Despesas Extras"].sum(),
+                        df_viagens["Diária do Motorista"].sum(),
+                        df_viagens["Valor do Combustível"].sum()
+                    ]
+                })
+                custos["Percentual"] = (custos["Valor"] / custos["Valor"].sum()) * 100
+                chart = alt.Chart(custos).mark_arc(innerRadius=50).encode(
+                    theta=alt.Theta(field="Valor", type="quantitative"),
+                    color=alt.Color(field="Categoria", type="nominal"),
+                    tooltip=[
+                        alt.Tooltip(field="Categoria", type="nominal"),
+                        alt.Tooltip(field="Valor", type="quantitative"),
+                        alt.Tooltip(field="Percentual", type="quantitative")
+                    ]
+                ).properties(width=400, height=400)
+                st.altair_chart(chart, use_container_width=True)
+                st.write("A distribuição dos custos das viagens pode ajudar a identificar as áreas onde os recursos estão sendo mais consumidos. Analise o impacto de cada categoria de custo.")
+            with grafico_tab3:
+                chart_scatter = alt.Chart(df_viagens).mark_circle(size=60).encode(
+                    x=alt.X("Total de KM:Q", title="Total KM"),
+                    y=alt.Y("Valor Total da Viagem:Q", title="Valor Total"),
+                    color=alt.Color("Endereço de Origem:O", legend=alt.Legend(title="Origem")),
+                    size=alt.Size("Valor Total da Viagem:Q", legend=alt.Legend(title="Valor Total")),
+                    tooltip=["Endereço de Origem", "Endereço de Destino", "Total de KM", "Valor Total da Viagem"]
+                ).interactive()
+                st.altair_chart(chart_scatter, use_container_width=True)
+                st.write("O gráfico de dispersão mostra a relação entre o Total de KM percorridos e o Valor Total das viagens. A segmentação por origem pode revelar padrões de custo e eficiência de cada região.")
+            with grafico_tab4:
+                chart_hist = alt.Chart(df_viagens).mark_bar().encode(
+                    alt.X("Total de KM:Q", bin=alt.Bin(maxbins=20), title="Total KM (binning)"),
+                    y=alt.Y("count():Q", title="Número de Viagens"),
+                    color=alt.Color("Total de KM:Q", scale=alt.Scale(scheme='greens'))
+                ).properties(width=600, height=400)
+                st.altair_chart(chart_hist, use_container_width=True)
+                st.write("Este histograma mostra a distribuição do Total KM percorrido nas viagens. Pode ajudar a identificar os intervalos de distância mais frequentes e onde as viagens mais longas ou curtas predominam.")
+            with grafico_tab5:
+                df_costos = df_viagens.groupby("Data de Saída")[
+                    ["Valor do Pedágio", "Despesas Extras", "Diária do Motorista", "Valor do Combustível"]
+                ].sum().reset_index()
+                chart_area = alt.Chart(df_costos).mark_area().encode(
+                    x='Data de Saída:T',
+                    y=alt.Y('Valor do Pedágio:Q', stack='zero', title="Custo Total"),
+                    color=alt.Color('variable:N', title="Categoria de Custo"),
+                ).transform_fold(
+                    ['Valor do Pedágio', 'Despesas Extras', 'Diária do Motorista', 'Valor do Combustível'],
+                    as_=['variable', 'value']
+                ).properties(
+                    title="Evolução dos Custos de Viagem ao Longo do Tempo",
+                    width=800,
+                    height=400
+                )
+                st.altair_chart(chart_area, use_container_width=True)
+                st.write("Este gráfico de área empilhada mostra a evolução dos custos de viagem ao longo do tempo. A segmentação por categoria de custo revela como cada tipo de custo contribui para o custo total das viagens ao longo dos dias.")
+        else:
+            st.info("Nenhuma viagem registrada ainda.")
+
+    # Aba 4: Cadastros
+    with aba_cadastros:
+        st.subheader("Cadastro de Dados")
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "Carros",
+            "Origens",
+            "Destinos",
+            "Tipos de Óleo",
+            "Motoristas"
+        ])
+        with tab1:
+            cadastro_carros(db)
+        with tab2:
+            cadastro_origem(db)
+        with tab3:
+            cadastro_destino(db)
+        with tab4:
+            cadastro_tipos_oleo(db)
+        with tab5:
+            cadastro_motoristas(db)
 
 def main():
     auth = AuthManager(env_file=".env")
