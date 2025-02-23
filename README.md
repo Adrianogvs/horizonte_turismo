@@ -91,7 +91,7 @@ Funções utilitárias, incluindo a conversão de **DataFrames** para arquivos *
 1. Clone este repositório:
    ```bash
    git clone https://github.com/Adrianogvs/horizonte_turismo.git
-   cd sistema-gestao-viagem
+   cd horizonte_turismo
    ```
 
 2. Instale as dependências:
